@@ -1,5 +1,5 @@
 
-from typing import Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel
 from pymongo import MongoClient
 
@@ -45,13 +45,13 @@ def save_to_mongo(pydantic_model: BaseModel):
     pass
 
 def get_job_from_db(job_name: str) -> Optional[Job]:
-    result = job_collection.find_one({"fullDisplayName": {"$regex": job_name}})
+    result = get_job_dict(job_name)
     if result:
         return Job(**result)
     return None
 
 def get_job_run_from_db(job_name: str, build_number: int) -> Optional[JobRun]:
-    result = job_run_collection.find_one({"fullDisplayName": {"$regex": job_name}, "buildNumber": build_number})
+    result = get_job_run_dict(job_name, build_number)
     if result:
         return create_job_run_from_data(result)
     return None
@@ -61,6 +61,12 @@ def job_already_exists(job_name: str) -> bool:
 
 def job_run_already_exists(job_name: str, build_number: int) -> bool:
     return get_job_run_from_db(job_name, build_number) is not None
+
+def get_job_dict(job_name: str) -> dict:
+    return job_collection.find_one({"fullDisplayName": {"$regex": job_name}})
+
+def get_job_run_dict(job_name: str, build_number: int) -> dict:
+    return job_run_collection.find_one({"fullDisplayName": {"$regex": job_name}, "buildNumber": build_number})
 
 def create_job_run_from_data(data: dict):
     try:
@@ -76,15 +82,27 @@ def create_job_run_from_data(data: dict):
         print(f"Error creating job run from data: {e}")
         print(data.keys())
 
-def get_job_runs_for_job(job_name: str) -> list[JobRun]:
-    # each job run has a name that contains the job name substring 
+def get_job_runs_dict_for_job(job_name: str) -> List[Dict]:
     result =  job_run_collection.find({"fullDisplayName": {"$regex": job_name}})
-    return [create_job_run_from_data(doc) for doc in result]
+    return [doc for doc in result]
+
+def get_job_runs_for_job(job_name: str) -> List[JobRun]:
+    return [create_job_run_from_data(doc) for doc in get_job_runs_dict_for_job(job_name)]
 
 # clear all jobs run from db
 def clear_db():
     job_run_collection.delete_many({})
     job_collection.delete_many({})
 
-    
-job_run_already_exists("20.04-Base-Oracle-Daily-Test", 1)
+
+def get_most_recent_job_run_dict(job_name: str) -> Optional[Dict]:
+    return job_run_collection.find_one(
+        {"fullDisplayName": {"$regex": job_name}},
+        sort=[("buildNumber", -1)]
+    )
+
+def get_most_recent_job_run(job_name: str) -> Optional[JobRun]:
+    result = get_most_recent_job_run_dict(job_name)
+    if result:
+        return create_job_run_from_data(result)
+    return None
