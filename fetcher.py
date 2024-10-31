@@ -394,8 +394,6 @@ def fetch_all_job_runs(job_name: str):
             print(f"Failed to fetch job run: {job_name} (#{build_number})")
             raise(e)
 
-clear_db()
-
 fetch_all_job_runs("25.04-Base-Oracle-Daily-Test")
 fetch_all_job_runs("24.10-Base-Oracle-Daily-Test")
 fetch_all_job_runs("24.04-Base-Oracle-Daily-Test")
