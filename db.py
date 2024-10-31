@@ -106,3 +106,7 @@ def get_most_recent_job_run(job_name: str) -> Optional[JobRun]:
     if result:
         return create_job_run_from_data(result)
     return None
+
+def get_all_jobs_matching_name(job_name: str) -> List[Job]:
+    result = job_collection.find({"fullDisplayName": {"$regex": job_name}})
+    return [Job(**doc) for doc in result]

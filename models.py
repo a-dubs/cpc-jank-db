@@ -1,3 +1,4 @@
+import utils
 from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Literal, Optional, Dict
 from datetime import datetime
@@ -75,11 +76,11 @@ class MatrixTestRunConfig(BaseModel):
     # debug_log_file_fetched: bool = Field(alias="debugLogFileFetched", default=False)
 
     @classmethod
-    def parse_url(cls, url: str):
+    def parse_url(cls, url: str, ignore_keys: List[str] = ["node"]):
         # Parse the KEY=VALUE pairs in the URL path
         pattern = r"(?P<key>\w+?)=(?P<value>[\w\.\d\-]+)"
         matches = re.findall(pattern, url)
-        url_params = {key.lower(): value for key, value in matches}
+        url_params = {key.lower(): value for key, value in matches if key.lower() not in ignore_keys}
         return url_params
 
     @classmethod
@@ -88,6 +89,10 @@ class MatrixTestRunConfig(BaseModel):
         # the build number is originally called "number"
         data["buildNumber"] = data.pop("number", None)
         return cls(url=url, **url_params, **data)
+    
+    @property
+    def config_string(self):
+        return " ".join([f"{key}={value}" for key, value in self.dict().items() if key not in ["url"]])
 
 class OracleMatrixTestRunConfig(MatrixTestRunConfig):
     launch_mode: str = Field(alias="launchMode")
@@ -125,6 +130,11 @@ class MatrixTestReport(BaseModel):
         config_obj = config_class.from_data(**child)
         result = TestResult.from_data(**result)
         return cls(testConfig=config_obj, testResult=result, url=child["url"])
+    
+    @classmethod
+    def generate_test_case_report_url(cls, job_url: str, test_case_name: str, test_case_class: str):
+        test_case_class = utils.rreplace(test_case_class, ".", "/", 1)
+        return f"{job_url.rstrip('/')}/testReport/junit/{test_case_class}/{test_case_name}"
 
 class MatrixTestResults(BaseModel):
     fail_count: int = Field(alias="failCount")
@@ -137,14 +147,39 @@ class MatrixTestResults(BaseModel):
         matrix_test_reports = [MatrixTestReport.from_data(**report) for report in data["childReports"]]
         return cls(matrixTestReports=matrix_test_reports, **data)
 
+class MatrixChildRun(JobRun):
+    self_class: str = Field(frozen=True, default="MatrixChildRun")
+    matrix_run_config: dict = Field(alias="matrixRunConfig")
+
+    @classmethod
+    def parse_url(cls, url: str, ignore_keys: List[str] = ["node"]):
+        # Parse the KEY=VALUE pairs in the URL path
+        pattern = r"(?P<key>\w+?)=(?P<value>[\w\.\d\-]+)"
+        matches = re.findall(pattern, url)
+        url_params = {key.lower(): value for key, value in matches if key.lower() not in ignore_keys}
+        return url_params
+
+    @classmethod
+    def from_data(cls, **data):
+        matrix_run_config = cls.parse_url(data["url"])
+        return cls(matrixRunConfig=matrix_run_config, **data)
+
+    @property
+    def config_string(self):
+        return ",".join([f"{key}={value}" for key, value in self.matrix_run_config.items()])
+    
+    @property
+    def config_values_string(self):
+        return " ".join([f"{value}" for value in self.matrix_run_config.values()])
+
 class MatrixJobRun(JobRun):
     self_class: str = Field(frozen=True, default="MatrixJobRun")
 
-    matrix_runs: List[JobRun] = Field(default_factory=list)
+    matrix_runs: List[MatrixChildRun] = Field(default_factory=list)
 
     @classmethod
     def from_data(cls, matrix_runs: List[dict], **data):
-        matrix_runs = [JobRun.from_data(**run) for run in matrix_runs]
+        matrix_runs = [MatrixChildRun.from_data(**run) for run in matrix_runs]
         job_run = super().from_data(**data)
         job_run.matrix_runs = matrix_runs
         return job_run
@@ -167,8 +202,7 @@ class TestMatrixJobRun(MatrixJobRun):
         Fetches the error details and stack trace for failed
         
         Args:
-            fetch_error_texts: callable that takes in a URL, test case class, and test case name
-                and returns a tuple of error details and error stack trace
+            fetch_error_texts: callable that takes in the URL of the test report and returns a tuple of error details and stack trace
         """
 
         for test_report in self.test_results.matrix_test_reports:
@@ -177,7 +211,11 @@ class TestMatrixJobRun(MatrixJobRun):
                     if case.status == "FAILED":
                         try:
                             error_details, error_stack_trace = fetch_error_texts(
-                                test_report.url, case.class_name, case.name
+                                test_report.generate_test_case_report_url(
+                                    job_url=test_report.url,
+                                    test_case_name=case.name,
+                                    test_case_class=case.class_name,
+                                )
                             )
                         except Exception as e:
                             print(f"Failed to fetch error texts for {case.name}, {case.class_name}, {self.url}")

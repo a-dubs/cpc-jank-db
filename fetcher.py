@@ -1,5 +1,6 @@
 
 from datetime import datetime
+import utils
 import json
 from pprint import pprint
 from typing import List, Tuple, Optional, Union
@@ -44,31 +45,6 @@ def fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
         return None
     
 
-"""
-"actions": [
-    {
-        "_class": "hudson.model.ParametersAction",
-        "parameters": [
-            {
-                "_class": "hudson.model.StringParameterValue",
-                "name": "SERIAL",
-                "value": "20241025"
-            },
-            {
-                "_class": "hudson.model.StringParameterValue",
-                "name": "SUITE",
-                "value": "noble"
-            },
-            {
-                "_class": "hudson.model.StringParameterValue",
-                "name": "CUSTOM_IMAGE_NAME_SUFFIX",
-                "value": ""
-            }
-        ]
-    },
-    ...
-]
-"""
 def get_build_parameters_from_actions(actions: list) -> dict:
     for action in actions:
         if action.get("_class") == "hudson.model.ParametersAction" or action.get("_class") == "hudson.matrix.MatrixChildParametersAction":
@@ -104,29 +80,12 @@ def get_job_run_info(job_name: str, build_number: Optional[int] = None) -> dict:
     else:
         return None
 
-def rreplace(s, old, new, count=-1):
-    """
-    Replace occurrences of 'old' with 'new' in the string 's', starting from the right.
-    
-    Parameters:
-    - s (str): The original string.
-    - old (str): The substring to be replaced.
-    - new (str): The substring to replace with.
-    - count (int): The number of occurrences to replace from the right. Default is -1, which replaces all occurrences.
-    
-    Returns:
-    - str: The modified string with replacements made from the right.
-    """
-    if count == -1:
-        return new.join(s.rsplit(old))
-    else:
-        return new.join(s.rsplit(old, count))
+
 
 @cache.memoize(expire=999999999999)  # Cache results for a long time
-def get_error_texts(matrix_child_url: str, test_case_class: str, test_case_name: str) -> Tuple[str, str]:
-    test_case_class = rreplace(test_case_class, ".", "/", 1)
-    url = matrix_child_url.rstrip("/") + f"/testReport/{test_case_class}/{test_case_name}/api/json"
-    url = convert_to_api_url(url)
+def get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
+    
+    url = convert_to_api_url(individual_test_report_url.rstrip("/") + "/api/json")
     print(f"Fetching error texts from {url}")
     r = requests.get(url, auth=auth)
     if r.status_code == 200:
@@ -168,98 +127,11 @@ def fetch_matrix_child_runs(matrix_job_run_url: str) -> List[dict]:
         return []
 
 
-# import pickle
-
-# if (os.path.exists("test_job_run.pkl")):
-#     with open("test_job_run.pkl", "rb") as f:
-#         test_job_run = pickle.load(f)
-# else:
-#     input("Press enter to fetch test job run info")
-#     test_job_run = parse_all_info_from_test_job_run("24.04-Base-Oracle-Daily-Test")
-
-#     # pickle the object 
-
-#     with open("test_job_run.pkl", "wb") as f:
-#         pickle.dump(test_job_run, f)
-
-# with open("test_job_run.json", "w") as f:
-#     f.write(test_job_run.model_dump_json(indent=2))
-
-
-
-# lets fetch some jobs!
-
-jobs_name_templates = [
-    "{suite}-{family}-{cloud}-{release}-Test",
-]
-
-suites = ["20.04", "22.04", "24.04", "24.10", "25.04"]
-families = ["Base", "Minimal"]
-clouds = ["Oracle", "IBM-Guest"]
-releases = ["Daily"]
-
-# for any combination of suites, families, clouds, and releases, 
-# if in the conflicts list, the job should not be fetched
-conflicts = [
-    {
-        "cloud": "IBM-Guest",
-        "family": "Minimal",
-    },
-]
-
-def is_conflict(**args):
-    for conflict in conflicts:
-        if all(args.get(key) == value for key, value in conflict.items()):
-            return True
-    return False
-
-def get_all_job_names_to_fetch() -> List[str]:
-    job_names = []
-    for suite in suites:
-        for family in families:
-            for cloud in clouds:
-                for release in releases:
-                    job_name = f"{suite}-{family}-{cloud}-{release}-Test"
-                    if not is_conflict(suite=suite, family=family, cloud=cloud):
-                        job_names.append(job_name)
-
-    return job_names
-
-JSON_DB_PATH = "test_results_db.json"
-
-print(get_all_job_names_to_fetch())
-
 def serialize_non_basic_values(object):
     if isinstance(object, datetime):
         return object.isoformat()  # Converts to ISO 8601 string format
     else:
         raise ValueError(f"unexpected object type trying to serialize ({object.__class__.__name__}): {object}")
-
-# def fetch_all_jobs(num_recent_jobs_to_fetch: int = 1):
-#     # read in the json db
-#     json_db = {}
-#     # if os.path.exists(JSON_DB_PATH):
-#     #     with open(JSON_DB_PATH, "r") as f:
-#     #         json_db = json.load(f)
-#     # else:
-#     #     json_db = {}
-
-#     for job_name in get_all_job_names_to_fetch():
-#         job_info = get_job_run_info(job_name)
-#         last_build_no = job_info["build_number"]
-#         for build_number in range(last_build_no, last_build_no - num_recent_jobs_to_fetch, -1):
-#             if (check_if_job_exists(job_name, build_number)):
-#                 print(f"Job: {job_name} (#{build_number}) already exists in the database")
-#                 continue
-#             print(f"Fetching job: {job_name} (#{build_number})")
-#             try:
-#                 test_job_run = parse_all_info_from_test_job_run(job_name, build_number=build_number)
-#                 save_to_mongo(test_job_run)
-#             except Exception as e:
-#                 print(f"Failed to fetch job: {job_name} (#{build_number})")
-#                 print(e)
-
-# fetch_all_jobs(30)
 
 def get_test_job_run(job_name: str, build_number: int) -> TestMatrixJobRun:
     print(f"Fetching full test job run: {job_name} (#{build_number})")
@@ -393,8 +265,3 @@ def fetch_all_job_runs(job_name: str):
         except Exception as e:
             print(f"Failed to fetch job run: {job_name} (#{build_number})")
             raise(e)
-
-all_job_names = get_all_job_names_to_fetch()
-for job_name in all_job_names:
-    fetch_all_job_runs(job_name)
-
