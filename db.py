@@ -40,8 +40,6 @@ def save_to_mongo(pydantic_model: BaseModel):
             print("Saving job run to mongo")
             document = pydantic_model.model_dump(by_alias=True, exclude_unset=False)
             job_run_collection.insert_one(document)
-            print(document.keys())
-            input()
     else:
         raise ValueError("pydantic_model must be either a Job or JobRun instance")
     pass
