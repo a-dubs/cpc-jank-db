@@ -193,7 +193,7 @@ jobs_name_templates = [
     "{suite}-{family}-{cloud}-{release}-Test",
 ]
 
-suites = ["20.04", "22.04", "24.04"]  # add 25.10 soon
+suites = ["20.04", "22.04", "24.04", "24.10", "25.04"]
 families = ["Base", "Minimal"]
 clouds = ["Oracle", "IBM-Guest"]
 releases = ["Daily"]
@@ -394,8 +394,7 @@ def fetch_all_job_runs(job_name: str):
             print(f"Failed to fetch job run: {job_name} (#{build_number})")
             raise(e)
 
-fetch_all_job_runs("25.04-Base-Oracle-Daily-Test")
-fetch_all_job_runs("24.10-Base-Oracle-Daily-Test")
-fetch_all_job_runs("24.04-Base-Oracle-Daily-Test")
-fetch_all_job_runs("22.04-Base-Oracle-Daily-Test")
-fetch_all_job_runs("20.04-Base-Oracle-Daily-Test")
+all_job_names = get_all_job_names_to_fetch()
+for job_name in all_job_names:
+    fetch_all_job_runs(job_name)
+
