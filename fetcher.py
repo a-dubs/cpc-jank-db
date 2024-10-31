@@ -390,7 +390,6 @@ def fetch_all_job_runs(job_name: str):
         try:
             test_job_run = get_test_job_run(job_name, build_number=build_number)
             save_to_mongo(test_job_run)
-            print(test_job_run._class)
         except Exception as e:
             print(f"Failed to fetch job run: {job_name} (#{build_number})")
             raise(e)
