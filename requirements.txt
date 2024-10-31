@@ -1,0 +1,5 @@
+diskcache
+pymongo
+python-dotenv
+requests
+pydantic
