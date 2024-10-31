@@ -51,7 +51,7 @@ class JobRun(BaseModel):
     url: str
     name: str = Field(alias="fullDisplayName")
     build_number: int = Field(alias="buildNumber")
-    serial: int
+    serial: str
     suite: str
     description: Optional[str] = None
     timestamp_ms: int = Field(description="Timestamp of the job run in ms since epoch")
