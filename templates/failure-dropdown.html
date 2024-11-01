@@ -1,0 +1,19 @@
+<div class="dropdown is-hoverable">
+  <div class="dropdown-trigger">
+    <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+      <span>{{ test.test_name }}</span>
+    </button>
+  </div>
+  <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+    <div class="dropdown-content">
+      <div class="dropdown-item">
+        <p class="test-failure-links">
+          {% for case in test.cases %}
+          <a href="{{ case.link }}">{{ case.name }}</a>
+          {% endfor %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+

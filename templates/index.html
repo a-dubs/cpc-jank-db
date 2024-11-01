@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>I/O Observability</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
+  </head>
+  <body>
+
+
+    <div id="root">
+      <h1 class="title">Oracle</h1>
+      <p>timestamp</p>
+      <table class="table is-striped is-bordered">
+        <thead>
+          <tr>
+            <th><abbr title="suite">📦 Suite</abbr></th>
+            <th><abbr title="family">👨‍👩‍👧‍👦 Family</abbr></th>
+            <th><abbr title="build-status">🏗️ Build</abbr></th>
+            <th><abbr title="upload-status">⬆️ Upload</abbr></th>
+            <th><abbr title="test-status">🧪 Test</abbr></th>
+            <th><abbr title="report">📊 Report</abbr></th>
+            <th><abbr title="failures">😩 Failures</abbr></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="">Jammy</td>
+            <td class="">Base</td>
+            <td class="">✅</td>
+            <td class="">⚠️</td>
+            <td class="">❌</td>
+            <td class="">0 ✅ / 0 ⚠️ / 0 ❌</td>
+            <td class="test-failures">
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_snap_pressed_optimized (4/8)</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p class="test-failure-links">
+                        <a href="www.google.com">failed test 1</a>
+                        <a href="www.google.com">failed test 2</a>
+                        <a href="www.google.com">failed test 3</a>
+                        <a href="www.google.com">failed test 4</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_something_else</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_another_test_failed</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="">Jammy</td>
+            <td class="">Base</td>
+            <td class="">✅</td>
+            <td class="">⚠️</td>
+            <td class="">❌</td>
+            <td class="">0 ✅ / 0 ⚠️ / 0 ❌</td>
+            <td class="test-failures">
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_snap_pressed_optimized</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p class="test-failure-links">
+                        <a href="www.google.com">failed test 1</a>
+                        <a href="www.google.com">failed test 2</a>
+                        <a href="www.google.com">failed test 3</a>
+                        <a href="www.google.com">failed test 4</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_something_else</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_another_test_failed</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="">Jammy</td>
+            <td class="">Base</td>
+            <td class="">✅</td>
+            <td class="">⚠️</td>
+            <td class="">❌</td>
+            <td class="">0 ✅ / 0 ⚠️ / 0 ❌</td>
+            <td class="test-failures">
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_snap_pressed_optimized</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p class="test-failure-links">
+                        <a href="www.google.com">failed test 1</a>
+                        <a href="www.google.com">failed test 2</a>
+                        <a href="www.google.com">failed test 3</a>
+                        <a href="www.google.com">failed test 4</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_something_else</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="dropdown is-hoverable">
+                <div class="dropdown-trigger">
+                  <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+                    <span>tests.BasicUbuntu.test_another_test_failed</span>
+                  </button>
+                </div>
+                <div class="dropdown-menu" id="dropdown-menu4" role="menu">
+                  <div class="dropdown-content">
+                    <div class="dropdown-item">
+                      <p>
+                        <a href="www.google.com">failed test 1</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+
+        </tbody>
+      </table>
+
+    </div>
+
+  </body>
+</html>

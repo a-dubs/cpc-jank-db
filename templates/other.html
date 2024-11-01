@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>I/O Observability</title>
+    <!-- <link rel="stylesheet" href="css/style.css"> -->
+    <style>
+    {% include 'style.css'%}
+    </style>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">
+  </head>
+  <body>
+    <p>{{ timestamp }}</p>
+    <div id="root">
+      {% for project in projects %}
+      <h1 class="title">{{ project.name }}</h1>
+      <table class="table is-striped is-bordered">
+        <thead>
+          <tr>
+            <th><abbr title="suite">📦 Suite</abbr></th>
+            <th><abbr title="family">👨‍👩‍👧‍👦 Family</abbr></th>
+            <th><abbr title="build-status">🏗️ Build</abbr></th>
+            <th><abbr title="upload-status">⬆️ Upload</abbr></th>
+            <th><abbr title="test-status">🧪 Test</abbr></th>
+            <th><abbr title="report">📊 Report</abbr></th>
+            <th><abbr title="failures">😩 Failures</abbr></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in project.jobs %}
+            {% include 'table-row.html' %}
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+
+    </div>
+
+  </body>
+</html>

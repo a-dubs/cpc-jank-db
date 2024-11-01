@@ -1,0 +1,13 @@
+<tr>
+  <td class="">{{ job.suite }}</td>
+  <td class="">{{ job.family }}</td>
+  <td class="">{{ job.build_state }}</td>
+  <td class="">{{ job.upload_state }}</td>
+  <td class="">{{ job.test_state }}</td>
+  <td class="">{{ job.pass_count }} ✅ / {{ job.warn_count}} ⚠️ / {{ job.fail_count }} ❌</td>
+  <td class="test-failures">
+    {% for test in job.tests %}
+      {% include 'failure-dropdown.html' %}
+    {% endfor %}
+  </td>
+</tr>

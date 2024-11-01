@@ -3,3 +3,4 @@ pymongo
 python-dotenv
 requests
 pydantic
+jinja2
