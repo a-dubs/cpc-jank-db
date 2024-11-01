@@ -72,4 +72,8 @@ def render_template_to_file(template_name, context, output_file):
     print(f"Template rendered and saved to {output_file}")
 
 
-render_template_to_file('other.html', context, 'index.html')
+render_template_to_file(
+    template_name="index.html",
+    context=context,
+    output_file="index.html"
+)
