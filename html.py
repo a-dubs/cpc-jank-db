@@ -1,3 +1,4 @@
+from pprint import pprint
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import datetime as dt
 
@@ -34,12 +35,12 @@ j = {
 
 oracle = {
     "name": "Oracle",
-    "jobs": [j,j,j]
+    "pipeline_runs": [j,j,j]
 }
 
 ibm = {
     "name": "IBM",
-    "jobs": [j,j]
+    "pipeline_runs": [j,j]
 }
 
 
@@ -48,6 +49,11 @@ context = {
     'timestamp': dt.datetime.now(),
     'projects': [ibm, oracle]
 }
+
+import pre_html
+
+context = pre_html.html_report
+
 
 # Render template with context
 rendered_output = template.render(context)
@@ -66,3 +72,4 @@ def render_template_to_file(template_name, context, output_file):
     print(f"Template rendered and saved to {output_file}")
 
 
+render_template_to_file('other.html', context, 'index.html')

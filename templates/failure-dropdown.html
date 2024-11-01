@@ -1,15 +1,15 @@
 <div class="dropdown is-hoverable">
   <div class="dropdown-trigger">
-    <button class="button" aria-haspopup="true" aria-controls="dropdown-menu4">
+    <div class="idek" aria-haspopup="true" aria-controls="dropdown-menu4">
       <span>{{ test.test_name }}</span>
-    </button>
+    </div>
   </div>
   <div class="dropdown-menu" id="dropdown-menu4" role="menu">
     <div class="dropdown-content">
       <div class="dropdown-item">
         <p class="test-failure-links">
-          {% for case in test.cases %}
-          <a href="{{ case.link }}">{{ case.name }}</a>
+          {% for case in test.runs %}
+          <a href="{{ case.url }}">{{ case.config_string }}</a>
           {% endfor %}
         </p>
       </div>

@@ -1,13 +1,37 @@
 <tr>
-  <td class="">{{ job.suite }}</td>
-  <td class="">{{ job.family }}</td>
-  <td class="">{{ job.build_state }}</td>
-  <td class="">{{ job.upload_state }}</td>
-  <td class="">{{ job.test_state }}</td>
-  <td class="">{{ job.pass_count }} ✅ / {{ job.warn_count}} ⚠️ / {{ job.fail_count }} ❌</td>
-  <td class="test-failures">
-    {% for test in job.tests %}
-      {% include 'failure-dropdown.html' %}
-    {% endfor %}
-  </td>
+    <td class="">{{ job.suite }}</td>
+    <td class="">{{ job.family }}</td>
+    <td class="">
+        {% if job.build_job_info.result == 'SUCCESS' %} ✅
+        {% elif job.build_job_info.result == 'FAILURE' %} ❌
+        {% elif job.build_job_info.result == 'UNSTABLE' %} ⚠️
+        {% else %} {{ job.build_job_info.result }}
+        {% endif %}
+    </td>
+    <td class="">
+        {% if job.upload_job_info.result == 'SUCCESS' %} ✅
+        {% elif job.upload_job_info.result == 'FAILURE' %} ❌
+        {% elif job.upload_job_info.result == 'UNSTABLE' %} ⚠️
+        {% else %} {{ job.upload_job_info.result }}
+        {% endif %}
+    </td>
+    <td class="">
+        {% if job.test_job_info.result == 'SUCCESS' %} ✅
+        {% elif job.test_job_info.result == 'FAILURE' %} ❌
+        {% elif job.test_job_info.result == 'UNSTABLE' %} ⚠️
+        {% else %} {{ job.test_job_info.result }}
+        {% endif %}
+    </td>
+    <td class="">{{ job.test_job_info.matrix_results.success }} ✅</td>
+    <td class="">{{ job.test_job_info.matrix_results.unstable }} ⚠️</td>
+    <td class="">{{ job.test_job_info.matrix_results.failure }} ❌</td>
+    <td class="test-failures">
+        {% if job.test_failures %}
+            {% for test in job.test_failures %}
+                {% include 'failure-dropdown.html' %}
+            {% endfor %}
+        {% else %}
+            <p>No Failures :D</p>
+        {% endif %}
+    </td>
 </tr>

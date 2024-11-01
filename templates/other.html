@@ -24,12 +24,12 @@
             <th><abbr title="build-status">🏗️ Build</abbr></th>
             <th><abbr title="upload-status">⬆️ Upload</abbr></th>
             <th><abbr title="test-status">🧪 Test</abbr></th>
-            <th><abbr title="report">📊 Report</abbr></th>
+            <th colspan="3"><abbr title="report">📊 Report</abbr></th>
             <th><abbr title="failures">😩 Failures</abbr></th>
           </tr>
         </thead>
         <tbody>
-          {% for job in project.jobs %}
+          {% for job in project.pipeline_runs %}
             {% include 'table-row.html' %}
           {% endfor %}
         </tbody>

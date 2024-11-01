@@ -18,7 +18,7 @@ body {
 }
 
 .test-failures {
-  max-height: 15vh !important;
+  max-height: 200px !important;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -30,5 +30,7 @@ body {
 
 .test-failure-links {
   display: flex;
+  padding: .25em 0;
+  line-height: 1;
   flex-direction: column;
 }

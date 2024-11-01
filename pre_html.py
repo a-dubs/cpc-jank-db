@@ -69,8 +69,8 @@ class TestJobInfo(BaseModel):
 
 class PipelineRunInformation(BaseModel):
     suite: str
-    serial: str
     family: str
+    serial: str
     build_job_info: BuildJobInfo
     upload_job_info: UploadJobInfo
     test_job_info: TestJobInfo
@@ -88,8 +88,8 @@ class PipelineRunInformation(BaseModel):
             family="Base" if "base" in test_job_run.name.lower() else "Minimal",
             suite=test_job_run.suite,
             serial=test_job_run.serial,
-            build_job_info=BuildJobInfo(result="PASSED"),
-            upload_job_info=UploadJobInfo(result="PASSED"),
+            build_job_info=BuildJobInfo(result="SUCCESS"),
+            upload_job_info=UploadJobInfo(result="SUCCESS"),
             test_job_info=TestJobInfo.from_job_run(test_job_run),
             test_failures=results_parser.get_failed_test_details(test_job_run),
         )
@@ -230,7 +230,7 @@ def fetch_job_runs(projects: List[ProjectConfig]):
 
 PROJECTS = [IBM_GUEST_PROJECT_CONFIG, ORACLE_PROJECT_CONFIG]
 
+
 # then create a list of PipelineRunInformation objects
 html_report = HTMLReportInformation.fetch_from_db(PROJECTS)
 
-pprint(html_report.model_dump())
