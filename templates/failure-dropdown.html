@@ -9,7 +9,10 @@
       <div class="dropdown-item">
         <p class="test-failure-links">
           {% for case in test.runs %}
-          <a href="{{ case.url }}">{{ case.config_string }}</a>
+          <div class="case">
+            <a class="test-case-link" href="{{ case.url }}">{{ case.config_string }}</a>
+            <code class="error-log">{{ case.error_log }}</code>
+          </div>
           {% endfor %}
         </p>
       </div>

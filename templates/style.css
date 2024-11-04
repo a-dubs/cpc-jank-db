@@ -30,7 +30,42 @@ body {
 
 .test-failure-links {
   display: flex;
+  /* padding: .25em 0; */
+  /* line-height: 1; */
+  flex-direction: column;
+}
+
+/* ****************************** */
+/*  CSS for error log box */
+
+.test-case-link {
+  display: flex;
   padding: .25em 0;
   line-height: 1;
   flex-direction: column;
+}
+
+/* container for the test case link and error log. */
+.case {
+  /* add styling for the container */
+}
+
+/* position the error log container & contents */
+.error-log {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  max-width: 20vw;
+  font-size: 1em;
+  display: none;
+}
+
+/* Show the current error log */
+.case:hover .error-log {
+  display: block;
+}
+
+/* supress all other error logs that are not hovered on */
+.case:hover ~ .case .error-log {
+  display: none;
 }
