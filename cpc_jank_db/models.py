@@ -59,7 +59,13 @@ class JobRun(BaseModel):
     duration_ms: int = Field(description="Duration of the job run in milliseconds")
     build_parameters: Dict[str, str] = Field(alias="buildParameters")
     result: Literal["SUCCESS", "FAILURE", "UNSTABLE", "ABORTED"]
-    # console_output: Optional[str] = Field(alias="consoleOutput", default=None)
+    child_runs_urls: Optional[List[str]] = Field(
+        alias="childRunsUrls",
+        default=None,
+        description="If this is a matrix job, this will contain the URLs of the child runs."
+            "Otherwise, it will be None to indicate that this is not a matrix job.", 
+    )
+    console_output: Optional[str] = Field(alias="consoleOutput", default=None)
 
     @classmethod
     def from_data(cls, **data):
