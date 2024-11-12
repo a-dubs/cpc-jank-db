@@ -19,6 +19,9 @@ job_run_collection = db["jenkins_job_run_collection"]
 
 def save_to_mongo(pydantic_model: BaseModel):
     """Convert pydantic model to a dict and insert into MongoDB."""
+    
+    if pydantic_model is None:
+        raise ValueError("pydantic_model must not be None")
 
     # if it is a Job, insert into job_collection
     if isinstance(pydantic_model, Job):
@@ -48,7 +51,7 @@ def save_to_mongo(pydantic_model: BaseModel):
             document = pydantic_model.model_dump(by_alias=True, exclude_unset=False)
             job_run_collection.insert_one(document)
     else:
-        raise ValueError("pydantic_model must be either a Job or JobRun instance")
+        raise ValueError(f"pydantic_model must be either a Job or JobRun instance, not: {pydantic_model} ({type(pydantic_model)})")
     pass
 
 def get_job_from_db(job_name: str) -> Optional[Job]:
@@ -117,3 +120,6 @@ def get_most_recent_job_run(job_name: str) -> Optional[JobRun]:
 def get_all_jobs_matching_name(job_name: str) -> List[Job]:
     result = job_collection.find({"fullDisplayName": {"$regex": job_name}})
     return [Job(**doc) for doc in result]
+
+# if __name__ == "__main__":
+#     clear_db()
