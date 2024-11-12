@@ -1,7 +1,7 @@
 from pprint import pprint
 from typing import Dict, Set, Tuple
-import db
-from models import *
+from cpc_jank_db import db
+from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun, OracleMatrixTestRunConfig
 
 # Function to get the set of tests that exist from a TestMatrixJobRun
 def get_test_set(test_job: TestMatrixJobRun) -> Set[str]:
