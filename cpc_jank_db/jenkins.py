@@ -1,6 +1,6 @@
 
 from datetime import datetime
-import utils
+from cpc_jank_db import utils
 import json
 from pprint import pprint
 from typing import List, Tuple, Optional, Union
@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 import dotenv
 
-from models import TestMatrixJobRun, Job, JobRun
+from cpc_jank_db.models import TestMatrixJobRun, Job, JobRun
 
 dotenv.load_dotenv()
 import os
@@ -20,11 +20,11 @@ auth = (os.getenv("JENKINS_API_USERNAME"), os.getenv("JENKINS_API_PASSWORD"))
 
 import diskcache
 
-from db import *
+from cpc_jank_db import db
 
 cache = diskcache.Cache("cache")
 @cache.memoize(expire=999999999999)  # Cache results for a long time
-def fetch_test_job_results(job_name: str, build_number: int):
+def _fetch_test_job_results(job_name: str, build_number: int):
     url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/testReport/api/json"
     print(f"Fetching test job results from {url}")
     r = requests.get(url, auth=auth)
@@ -34,7 +34,7 @@ def fetch_test_job_results(job_name: str, build_number: int):
     else:
         return None
 
-def fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
+def _fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
     if build_number is None:
         build_number = "lastCompletedBuild"
     url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/injectedEnvVars/api/json"
@@ -45,7 +45,7 @@ def fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
         return None
     
 
-def get_build_parameters_from_actions(actions: list) -> dict:
+def _get_build_parameters_from_actions(actions: list) -> dict:
     for action in actions:
         if action.get("_class") == "hudson.model.ParametersAction" or action.get("_class") == "hudson.matrix.MatrixChildParametersAction":
             return {param["name"]: param["value"] for param in action["parameters"]}
@@ -54,7 +54,7 @@ def get_build_parameters_from_actions(actions: list) -> dict:
         
     return {}
 
-def get_job_run_info(job_name: str, build_number: Optional[int] = None) -> dict:
+def _get_job_run_info(job_name: str, build_number: Optional[int] = None) -> dict:
     
     # url =
     # "http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/24.04-Base-Oracle-Daily-Test/lastCompletedBuild/api/json"
@@ -68,7 +68,7 @@ def get_job_run_info(job_name: str, build_number: Optional[int] = None) -> dict:
 
     if r.status_code == 200:
         data = r.json()
-        build_params = get_build_parameters_from_actions(data.get("actions"))
+        build_params = _get_build_parameters_from_actions(data.get("actions"))
         return {
             "serial": int(build_params.get("SERIAL")),
             "suite": build_params.get("SUITE"),
@@ -83,9 +83,9 @@ def get_job_run_info(job_name: str, build_number: Optional[int] = None) -> dict:
 
 
 @cache.memoize(expire=999999999999)  # Cache results for a long time
-def get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
+def _get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
     
-    url = convert_to_api_url(individual_test_report_url.rstrip("/") + "/api/json")
+    url = _convert_to_api_url(individual_test_report_url.rstrip("/") + "/api/json")
     print(f"Fetching error texts from {url}")
     r = requests.get(url, auth=auth)
     if r.status_code == 200:
@@ -94,20 +94,20 @@ def get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
     else:
         raise Exception(f"Failed to fetch error texts from {url}")
 
-def make_url_from_job_name(job_name: str) -> str:
+def _make_url_from_job_name(job_name: str) -> str:
     """
     Creates url of job, not api url.
     """
     return f"https://stable-cloud-images-ps5.jenkins.canonical.com/job/{job_name}/"
 
-def convert_to_api_url(url: str) -> str:
+def _convert_to_api_url(url: str) -> str:
     return str(url).replace(
         "https://stable-cloud-images-ps5.jenkins.canonical.com",
         "http://stable-cloud-images-ps5-jenkins-be.internal:8080",
     )
 
-def fetch_run_json(url: str) -> dict:
-    url = convert_to_api_url(url)
+def _fetch_run_json(url: str) -> dict:
+    url = _convert_to_api_url(url)
     if not url.endswith("/api/json") or not url.endswith("/api/json/"):
         url = url.rstrip("/") +  "/api/json"
     r = requests.get(url, auth=auth)
@@ -117,39 +117,39 @@ def fetch_run_json(url: str) -> dict:
         return {}
 
 @cache.memoize(expire=999999999999)  # Cache results for a long time
-def fetch_matrix_child_runs(matrix_job_run_url: str) -> List[dict]:
-    url = convert_to_api_url(matrix_job_run_url)
-    r = requests.get(convert_to_api_url(url), auth=auth)
+def _fetch_matrix_child_runs(matrix_job_run_url: str) -> List[dict]:
+    url = _convert_to_api_url(matrix_job_run_url)
+    r = requests.get(_convert_to_api_url(url), auth=auth)
     if r.status_code == 200:
         data = r.json()
-        return [parse_job_run_info(fetch_run_json(run["url"])) for run in data["runs"]]
+        return [_parse_job_run_info(_fetch_run_json(run["url"])) for run in data["runs"]]
     else:
         return []
 
 
-def serialize_non_basic_values(object):
+def _serialize_non_basic_values(object):
     if isinstance(object, datetime):
         return object.isoformat()  # Converts to ISO 8601 string format
     else:
         raise ValueError(f"unexpected object type trying to serialize ({object.__class__.__name__}): {object}")
 
-def get_test_job_run(job_name: str, build_number: int) -> TestMatrixJobRun:
+def _get_test_job_run(job_name: str, build_number: int) -> TestMatrixJobRun:
     print(f"Fetching full test job run: {job_name} (#{build_number})")
-    job_run = fetch_job_run_from_api(job_name, build_number)
+    job_run = _fetch_job_run_from_api(job_name, build_number)
 
     result = TestMatrixJobRun.from_data(
-        job_run_json=parse_job_run_info(fetch_job_run_json_from_api(job_name=job_name, build_number=build_number)),
+        job_run_json=_parse_job_run_info(_fetch_job_run_json_from_api(job_name=job_name, build_number=build_number)),
         # job_run_json=job_run.model_dump(by_alias=True, exclude_unset=True),
-        test_results_json=fetch_test_job_results(job_name, build_number),
-        matrix_runs=fetch_matrix_child_runs(job_run.url),
+        test_results_json=_fetch_test_job_results(job_name, build_number),
+        matrix_runs=_fetch_matrix_child_runs(job_run.url),
     )
 
-    result.fetch_error_texts_for_failed_tests(get_error_texts)
+    result.fetch_error_texts_for_failed_tests(_get_error_texts)
 
     return result
 
-def parse_job_run_info(data: dict) -> dict:
-    build_params = get_build_parameters_from_actions(data.get("actions"))
+def _parse_job_run_info(data: dict) -> dict:
+    build_params = _get_build_parameters_from_actions(data.get("actions"))
     if "SERIAL" not in build_params or "SUITE" not in build_params:
         exit(1)
     return {
@@ -166,14 +166,14 @@ def parse_job_run_info(data: dict) -> dict:
     }
 
 @cache.memoize(expire=100000)  # Cache results for a long time
-def fetch_job_run_from_api(job_name: str, build_number: int) -> JobRun:
+def _fetch_job_run_from_api(job_name: str, build_number: int) -> JobRun:
     print(f"Fetching job run from API: {job_name} (#{build_number})")
     url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/api/json"
     r = requests.get(url, auth=auth)
 
     if r.status_code == 200:
         data = r.json()
-        build_params = get_build_parameters_from_actions(data.get("actions"))
+        build_params = _get_build_parameters_from_actions(data.get("actions"))
         return JobRun(
             url=url,
             fullDisplayName=data["fullDisplayName"],
@@ -189,7 +189,7 @@ def fetch_job_run_from_api(job_name: str, build_number: int) -> JobRun:
     else:
         return None
     
-def fetch_job_run_json_from_api(job_name: str, build_number: int) -> dict:
+def _fetch_job_run_json_from_api(job_name: str, build_number: int) -> dict:
     print(f"Fetching job run from API: {job_name} (#{build_number})")
     url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/api/json"
     r = requests.get(url, auth=auth)
@@ -199,13 +199,13 @@ def fetch_job_run_json_from_api(job_name: str, build_number: int) -> dict:
     else:
         return None
 
-def fetch_job_from_api(job_name: str) -> Job:
+def _fetch_job_from_api(job_name: str) -> Job:
     print(f"Fetching job from API: {job_name}")
-    url = make_url_from_job_name(job_name) + "api/json"
-    r = requests.get(convert_to_api_url(url), auth=auth)
+    url = _make_url_from_job_name(job_name) + "api/json"
+    r = requests.get(_convert_to_api_url(url), auth=auth)
     if r.status_code == 200:
         data = r.json()
-        params = get_build_parameters_from_actions(data.get("actions"))
+        params = _get_build_parameters_from_actions(data.get("actions"))
         suite = params.get("SUITE")
         if data.get("lastCompletedBuild"):
             last_completed_build_number = data.get("lastCompletedBuild").get("number")
@@ -223,15 +223,15 @@ def fetch_job_from_api(job_name: str) -> Job:
         return None
 
 
-def fetch_and_refresh_job(job_name: str) -> Job:
+def _fetch_and_refresh_job(job_name: str) -> Job:
     """
     Get newest job data from API and update existing job in the database if it exists.
     """
     job = get_job_from_db(job_name)
     if job is None:
-        job = fetch_job_from_api(job_name)
+        job = _fetch_job_from_api(job_name)
     else:  # update job
-        new_job = fetch_job_from_api(job_name)
+        new_job = _fetch_job_from_api(job_name)
         if new_job is not None:
             # update job with new description and build numbers and update last_updated
             job.description = new_job.description
@@ -241,8 +241,26 @@ def fetch_and_refresh_job(job_name: str) -> Job:
     return job
 
 
-def fetch_all_job_runs(job_name: str):
-    job = fetch_and_refresh_job(job_name)
+def collect_all_job_runs(job_name: str) -> Tuple[Job, List[JobRun]]:
+    """
+    Fetch all job runs for a job and save them to the database.
+    
+    Args:
+        job_name (str): The name of the job to fetch job runs for.
+
+        Example: "24.04-Base-Oracle-Daily-Test"
+        Example: "24.04-Base-Oracle-Build-Images"
+    
+    Returns:
+        Tuple[Job, List[JobRun]]: A tuple containing the job and a list of job runs.
+
+            The job is the updated job object with the latest build numbers and description.
+
+            The list of job runs are the job runs that were fetched from the API, and saved to the database.
+            Any job runs that already existed in the database were not saved again and will not be in the list.
+    """
+    fetched_job_runs = []
+    job = _fetch_and_refresh_job(job_name)
     if job is None:
         raise ValueError(f"Failed to fetch job: {job_name}")
     
@@ -260,8 +278,14 @@ def fetch_all_job_runs(job_name: str):
 
         print(f"Fetching job run: {job_name} (#{build_number})")
         try:
-            test_job_run = get_test_job_run(job_name, build_number=build_number)
+            test_job_run = _get_test_job_run(job_name, build_number=build_number)
             save_to_mongo(test_job_run)
+            fetched_job_runs.append(test_job_run)
         except Exception as e:
             print(f"Failed to fetch job run: {job_name} (#{build_number})")
             raise(e)
+
+    return job, fetched_job_runs
+
+if __name__ == "__main__":
+    print("This module is not meant to be run directly. Import it into another module.")

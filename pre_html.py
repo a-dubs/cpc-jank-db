@@ -118,8 +118,6 @@ class JobNamer(BaseModel):
     def test_job_name(self, pipeline_config: PipelineConfig):
         return self.test_name_template.format(**pipeline_config.model_dump())
 
-
-
 def generate_ibm_guest_pipeline_configs() -> List[PipelineConfig]:
     releases = ["20.04", "22.04", "24.04", "24.10", "25.04"]
     families = ["Base"]
@@ -219,7 +217,7 @@ class HTMLReportInformation(BaseModel):
 
         return cls(projects=project_info)
 
-from fetcher import fetch_all_job_runs
+from cpc_jank_db.fetcher import fetch_all_job_runs
 
 def fetch_job_runs(projects: List[ProjectConfig]):
     for project in projects:

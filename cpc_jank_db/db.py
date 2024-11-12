@@ -1,9 +1,16 @@
+"""
+Module for interacting with the underlying MongoDB database.
+
+This module provides functions for saving and retrieving Job and JobRun instances from the database.
+
+Any processing of the data should be done elsewhere.
+"""
 
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from pymongo import MongoClient
 
-from models import Job, JobRun, MatrixJobRun, TestMatrixJobRun
+from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun
 
 client = MongoClient("mongodb://localhost:27017/")
 db = client["test_jenkins_observability_db"]

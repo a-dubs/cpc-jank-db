@@ -1,4 +1,4 @@
-import utils
+from cpc_jank_db import utils
 from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Literal, Optional, Dict
 from datetime import datetime
