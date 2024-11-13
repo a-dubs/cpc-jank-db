@@ -170,8 +170,8 @@ def _convert_to_api_url(url: str) -> str:
         "https://stable-cloud-images-ps5.jenkins.canonical.com",
         "http://stable-cloud-images-ps5-jenkins-be.internal:8080",
     )
-    if not r.endswith("/api/json") or not r.endswith("/api/json/"):
-        r = r.rstrip("/") + "/api/json"
+    r = r.removesuffix("/").removesuffix("/api/json")
+    r += "/api/json"
     return r
 
 def _fetch_json(url: str) -> dict:
