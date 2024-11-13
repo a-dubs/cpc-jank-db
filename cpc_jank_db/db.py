@@ -12,7 +12,7 @@ from pymongo import MongoClient
 
 from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun
 
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient("mongodb://localhost:27069/")
 db = client["test_jenkins_observability_db"]
 job_collection = db["jenkins_job_collection"]
 job_run_collection = db["jenkins_job_run_collection"]
@@ -121,5 +121,10 @@ def get_all_jobs_matching_name(job_name: str) -> List[Job]:
     result = job_collection.find({"fullDisplayName": {"$regex": job_name}})
     return [Job(**doc) for doc in result]
 
-# if __name__ == "__main__":
-#     clear_db()
+if __name__ == "__main__":
+    # print out list of all job names in the db and then also print out the number of job runs stored for each job
+    all_jobs = job_collection.find({})
+    for job in all_jobs:
+        job_name = job["fullDisplayName"]
+        runs = get_job_runs_for_job(job_name)
+        print(f"Job: {job_name} has {len(runs)} job runs stored")
