@@ -69,3 +69,45 @@ for job_name in ibm_job_names:
 for job_name in ibm_job_names:
     runs = db.get_job_runs_for_job(job_name)
     print(f"Found {len(runs)} job runs for {job_name}")
+
+########################################## OKE ##########################################
+
+# OKE pipeline configurations
+pipeline_keys = ["OKE-1.27", "OKE-1.29"]
+releases = ["20.04", "22.04", "24.04"]
+families = ["Minimal"]
+upload_types = ["Daily"]
+
+oke_job_name_templates = [
+    "{release}-{family}-{pipeline_key}-{upload_type}-Register-Image",
+    "{release}-{family}-{pipeline_key}-{upload_type}-CTF-Test",
+    "{release}-{family}-{pipeline_key}-{upload_type}-Sonobuoy-Test-Run",
+]
+
+# generate pipeline configurations using above parameters
+oke_configs = [config
+    for pipeline_key in pipeline_keys
+    for config in generate_pipeline_configs(
+        pipeline_key,
+        releases,
+        families,
+        upload_types,
+        oke_job_name_templates,
+    )
+]
+
+# generate all job names using the generated pipeline configurations
+oke_job_names = generate_all_job_names(oke_configs)
+
+print("oke_job_names:", oke_job_names)
+
+# collect job runs for each job
+for job_name in oke_job_names:
+    print("Collecting job runs for", job_name)
+    job, job_runs = collect_all_job_runs(job_name)
+    print(f"Collected {len(job_runs)} job runs for {job_name}")
+
+# query db to verify that the job runs were saved
+for job_name in oke_job_names:
+    runs = db.get_job_runs_for_job(job_name)
+    print(f"Found {len(runs)} job runs for {job_name}")
