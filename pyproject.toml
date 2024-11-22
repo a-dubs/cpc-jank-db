@@ -26,7 +26,7 @@ dependencies = [
     "python-dotenv",
     "requests",
     "pydantic",
-    "jinja2",
+    "pandas",
 ]
 
 # dependencies that are only needed for development or testing, not for project to run
