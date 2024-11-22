@@ -1,46 +1,4 @@
-from pprint import pprint
-from typing import Dict, Literal, Set, Tuple
-from cpc_jank_db import db
-from cpc_jank_db.models import Job, JobRun, MatrixJobRun, MatrixTestReport, MatrixTestRunConfig, TestCase, TestMatrixJobRun, OracleMatrixTestRunConfig
-import pandas as pd
-
-# Function to get the set of tests that exist from a TestMatrixJobRun
-def get_test_set(test_job: TestMatrixJobRun) -> Set[str]:
-    test_set = set()
-    if not test_job.test_results:
-        return test_set
-
-    for test_report in test_job.test_results.matrix_test_reports:
-        for suite in test_report.test_result.suites:
-            for case in suite.cases:
-                test_set.add(case.name)
-    return test_set
-
-# Function to get the tests that failed and their success, skip, and failure counts
-def get_test_stats(test_job: TestMatrixJobRun) -> Dict[str, Dict[str, int]]:
-    stats = {}
-
-    if not test_job.test_results:
-        return stats
-
-    for test_report in test_job.test_results.matrix_test_reports:
-        for suite in test_report.test_result.suites:
-            for case in suite.cases:
-                if case.name not in stats:
-                    stats[case.name] = {
-                        "succeeded": 0,
-                        "skipped": 0,
-                        "failed": 0
-                    }
-                
-                if case.status == "PASSED":
-                    stats[case.name]["succeeded"] += 1
-                elif case.status == "SKIPPED":
-                    stats[case.name]["skipped"] += 1
-                elif case.status == "FAILED":
-                    stats[case.name]["failed"] += 1
-
-    return stats
+from cpc_jank_db.models import MatrixJobRun
 
 def get_matrix_job_results(matrix_job: MatrixJobRun):
     # take in a matrix job and get statuses for each child run (matrix_runs field)
