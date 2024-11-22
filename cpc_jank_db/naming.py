@@ -28,8 +28,17 @@ Example:
 """
 
 
+import re
 from typing import List
 from pydantic import BaseModel, Field
+
+suites = {
+    "20.04": "focal",
+    "22.04": "jammy",
+    "24.04": "noble",
+    "24.10": "oracular",
+    "25.04": "plucky",
+}
 
 # feel free to import this and extend it in your own code
 class PipelineConfig(BaseModel):
@@ -42,9 +51,32 @@ class PipelineConfig(BaseModel):
         examples="['{release}-{family}-Oracle-Build-Images', '{release}-{family}-Oracle-{upload_type}-Upload-Image', '{release}-{family}-Oracle-{upload_type}-Test']"
     )
 
+    @property 
+    def name(self):
+        return f"{self.pipeline_key}-{self.release}-{self.family}-{self.upload_type}"
+
+    @property
+    def suite(self):
+        return suites.get(self.release, None)
+
     @property
     def all_job_names(self):
         return [template.format(**self.model_dump()) for template in self.job_name_templates]
+    
+    def get_job_name(self, re_str: str):
+        return next((job_name for job_name in self.all_job_names if re.findall(re_str, job_name.lower())), None)
+    
+    @property
+    def test_job_name(self):
+        return self.get_job_name(r"test")
+    
+    @property
+    def build_job_name(self):   
+        return self.get_job_name(r"build")
+    
+    @property
+    def upload_job_name(self):
+        return self.get_job_name(r"upload|register")
 
 # this function is an example of how you could generate pipeline configurations
 # this should work for all basic pipelines
@@ -116,3 +148,23 @@ def generate_all_job_names(
         for pipeline_config in pipeline_configs
         for job_name in pipeline_config.all_job_names
     ]
+
+class ProjectConfig(BaseModel):
+    name: str
+    pipeline_configs: List[PipelineConfig]
+
+    @property
+    def all_job_names(self):
+        return generate_all_job_names(self.pipeline_configs)
+    
+    @property
+    def test_job_names(self):
+        return [pipeline_config.test_job_name for pipeline_config in self.pipeline_configs]
+    
+    @property
+    def build_job_names(self):
+        return [pipeline_config.build_job_name for pipeline_config in self.pipeline_configs]
+    
+    @property
+    def upload_job_names(self):
+        return [pipeline_config.upload_job_name for pipeline_config in self.pipeline_configs]

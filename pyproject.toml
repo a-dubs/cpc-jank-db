@@ -44,6 +44,10 @@ test = [
 ]
 
 
+[tool.setuptools]
+packages = ["cpc_jank_db", "cpc_jank_frontend"]
+# packages.find.exclude = ["snap"] 
+
 # [project.scripts]
 # # Entry points for the package
 # jo_generate_html = "pages.generate_html:generate_all_html_files"
@@ -102,6 +106,3 @@ ignore = [
   # Any specific ruff rules to ignore (e.g. "PLW2901"). See https://docs.astral.sh/ruff/rules/
   # after each entry, leave a comment to the ruff rules page for the rule
 ]
-
-[tool.setuptools.packages.find]
-exclude = ["snap"]

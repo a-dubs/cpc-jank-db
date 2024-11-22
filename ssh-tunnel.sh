@@ -7,7 +7,7 @@ if [ -z "$i" ]
 then
 
 # port forward port 27017 from remote server to localhost port 27069
-ssh -L 27069:localhost:27017 -N -f -l ubuntu 54.87.228.164 
+ssh -L 27069:localhost:27017 -N -f -l ubuntu 54.87.228.164 && echo "tunnel created"
     
 fi
 
@@ -16,3 +16,4 @@ then
     echo "using provided key file $i"
     ssh -i $i -L 27069:localhost:27017 -N -f -l ubuntu 54.87.228.164 -i $i -o "IdentitiesOnly=yes"
 fi
+

@@ -44,8 +44,19 @@ class Job(BaseModel):
     build_numbers: List[int] = Field(alias="buildNumbers")
     last_completed_build_number: Optional[int] = Field(alias="lastCompletedBuildNumber", default=None)
     suite: str
+    family: Literal["Base", "Minimal"]
     description: Optional[str] = None
     last_updated: datetime = Field(alias="lastUpdated", default_factory=datetime.now)
+
+    def __init__(self, **data):
+        if "family" not in data:
+            name = data.get("fullDisplayName") or data.get("name")
+            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+        super().__init__(**data)
+
+    @classmethod
+    def from_data(cls, **data):
+        return cls(**data)
 
 class JobRun(BaseModel):
     self_class: str = Field(frozen=True, default="JobRun")
@@ -54,6 +65,7 @@ class JobRun(BaseModel):
     build_number: int = Field(alias="buildNumber")
     serial: str
     suite: str
+    family: Literal["Base", "Minimal"]
     description: Optional[str] = None
     timestamp_ms: int = Field(description="Timestamp of the job run in ms since epoch")
     duration_ms: int = Field(description="Duration of the job run in milliseconds")
@@ -67,6 +79,12 @@ class JobRun(BaseModel):
     )
     console_output: Optional[str] = Field(alias="consoleOutput", default=None)
 
+    def __init__(self, **data):
+        if "family" not in data:
+            name = data.get("fullDisplayName") or data.get("name")
+            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+        super().__init__(**data)
+
     @classmethod
     def from_data(cls, **data):
         return cls(**data)
@@ -74,6 +92,10 @@ class JobRun(BaseModel):
     @property
     def unique_identifier(self):
         return f"{self.name}-{self.serial}-{self.build_number}"
+    
+    @property
+    def job_name(self):
+        return self.name.split("#")[0].strip()
 
 class MatrixTestRunConfig(BaseModel):
     arch: Optional[str]
@@ -132,15 +154,15 @@ class MatrixTestReport(BaseModel):
 
     @classmethod
     def from_data(cls, child: dict, result: dict):
+        print("test_report_url", child["url"])
         config_class = getMatrixTestRunConfigClass(child)
         config_obj = config_class.from_data(**child)
         result = TestResult.from_data(**result)
         return cls(testConfig=config_obj, testResult=result, url=child["url"])
     
-    @classmethod
-    def generate_test_case_report_url(cls, job_url: str, test_case_name: str, test_case_class: str):
+    def generate_test_case_report_url(self, test_case_name: str, test_case_class: str):
         test_case_class = utils.rreplace(test_case_class, ".", "/", 1)
-        return f"{job_url.rstrip('/')}/testReport/junit/{test_case_class}/{test_case_name}"
+        return f"{self.url.rstrip('/')}/testReport/junit/{test_case_class}/{test_case_name}"
 
 class MatrixTestResults(BaseModel):
     fail_count: int = Field(alias="failCount")
@@ -156,6 +178,12 @@ class MatrixTestResults(BaseModel):
 class MatrixChildRun(JobRun):
     self_class: str = Field(frozen=True, default="MatrixChildRun")
     matrix_run_config: dict = Field(alias="matrixRunConfig")
+
+    def __init__(self, **data):
+        if "family" not in data:
+            name = data.get("fullDisplayName") or data.get("name")
+            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+        super().__init__(**data)
 
     @classmethod
     def parse_url(cls, url: str, ignore_keys: List[str] = ["node"]):
@@ -185,9 +213,9 @@ class MatrixJobRun(JobRun):
 
     @classmethod
     def from_data(cls, matrix_runs: List[dict], **data):
-        matrix_runs = [MatrixChildRun.from_data(**run) for run in matrix_runs]
+        matrix_run_objs = [MatrixChildRun.from_data(**run) for run in matrix_runs]
         job_run = super().from_data(**data)
-        job_run.matrix_runs = matrix_runs
+        job_run.matrix_runs = matrix_run_objs
         return job_run
 
 class TestMatrixJobRun(MatrixJobRun):
@@ -218,7 +246,6 @@ class TestMatrixJobRun(MatrixJobRun):
                         try:
                             error_details, error_stack_trace = fetch_error_texts(
                                 test_report.generate_test_case_report_url(
-                                    job_url=test_report.url,
                                     test_case_name=case.name,
                                     test_case_class=case.class_name,
                                 )

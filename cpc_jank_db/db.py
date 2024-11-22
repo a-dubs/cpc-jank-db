@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from pymongo import MongoClient
 
 from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun
+from cpc_jank_db.naming import PipelineConfig, ProjectConfig
 
 client = MongoClient("mongodb://localhost:27069/")
 db = client["test_jenkins_observability_db"]
@@ -89,8 +90,9 @@ def create_job_run_from_data(data: dict):
         else:
             raise ValueError(f"Unknown class: {data['self_class']}")
     except Exception as e:
-        print(f"Error creating job run from data: {e}")
+        print(f"[db] Error creating job run from data: {e}")
         print(data.keys())
+        input("Press enter to continue...")
 
 def get_job_runs_dict_for_job(job_name: str) -> List[Dict]:
     result =  job_run_collection.find({"fullDisplayName": {"$regex": job_name}})
@@ -120,6 +122,59 @@ def get_most_recent_job_run(job_name: str) -> Optional[JobRun]:
 def get_all_jobs_matching_name(job_name: str) -> List[Job]:
     result = job_collection.find({"fullDisplayName": {"$regex": job_name}})
     return [Job(**doc) for doc in result]
+
+
+# function to get job runs for a PipelineConfig
+def get_job_runs_for_pipeline_config(pipeline_config: PipelineConfig) -> List[JobRun]:
+    job_runs = []
+    for job_name in pipeline_config.all_job_names:
+        job_runs.extend(get_job_runs_for_job(job_name))
+    return job_runs
+
+def get_test_job_runs_for_pipeline_config(pipeline_config: PipelineConfig) -> List[TestMatrixJobRun]:
+    test_job_name = pipeline_config.test_job_name
+    if not test_job_name:
+        raise ValueError(f"No test job name found for pipeline config: {pipeline_config}")
+    return [job_run for job_run in get_job_runs_for_job(test_job_name) if isinstance(job_run, TestMatrixJobRun)]
+
+def get_test_job_runs_for_project(project_config: ProjectConfig) -> List[TestMatrixJobRun]:
+    test_job_runs = []
+    for pipeline_config in project_config.pipeline_configs:
+        test_job_runs.extend(get_test_job_runs_for_pipeline_config(pipeline_config))
+    return test_job_runs
+
+def get_job_runs_for_project(project_config: ProjectConfig) -> List[JobRun]:
+    job_runs = []
+    for pipeline_config in project_config.pipeline_configs:
+        job_runs.extend(get_job_runs_for_pipeline_config(pipeline_config))
+    return job_runs
+
+def _update_existing_entries_with_family_field():
+    """
+    Update all job and job run documents in the database to add the family field if it doesn't already exist.
+    """
+    all_jobs = job_collection.find({})
+    for job in all_jobs:
+        name = job["fullDisplayName"]
+        if "family" not in job:
+            job["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+            job_collection.update_one(
+                {"fullDisplayName": name},
+                {"$set": job}
+            )
+            print(f"Updated job: {name} with family: {job['family']}")
+
+    # get each job run document and update it to add the family field
+    all_job_runs = job_run_collection.find({})
+    for job_run in all_job_runs:
+        if "family" not in job_run:
+            name = job_run.get("fullDisplayName") or job_run.get("name")
+            family = "Minimal" if "minimal" in name.lower() else "Base"
+            job_run_collection.update_one(
+                {"fullDisplayName": name},
+                {"$set": {"family": family}}
+            )
+            print(f"Updated job run: {name} with family: {family}")
 
 if __name__ == "__main__":
     # print out list of all job names in the db and then also print out the number of job runs stored for each job

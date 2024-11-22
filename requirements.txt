@@ -4,3 +4,4 @@ python-dotenv
 requests
 pydantic
 jinja2
+pandas
