@@ -45,7 +45,10 @@ test = [
 
 
 [tool.setuptools]
-packages = ["cpc_jank_db"]
+packages = [
+    "cpc_jank_db",
+    "cpc_jank_db.data_analysis",
+]
 # packages.find.exclude = ["snap"] 
 
 # [project.scripts]
