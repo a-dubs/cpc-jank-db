@@ -10,7 +10,17 @@ from cpc_jank_db.models import MatrixJobRun, TestMatrixJobRun, Job, JobRun
 dotenv.load_dotenv()
 import os
 
+
 auth = (os.getenv("JENKINS_API_USERNAME"), os.getenv("JENKINS_API_PASSWORD"))
+
+JENKINS_API_URL = os.getenv("JENKINS_API_URL")
+JENKINS_SSO_URL = os.getenv("JENKINS_SSO_URL")
+
+if JENKINS_API_URL is None:
+    raise ValueError("JENKINS_API_URL not set in .env file")
+
+if JENKINS_SSO_URL is None:
+    raise ValueError("JENKINS_SSO_URL not set in .env file")
 
 import diskcache
 cache = diskcache.Cache(".disk-cache")
@@ -105,7 +115,7 @@ def _get_job_run_from_api(url: str) -> dict:
 
 # @cache.memoize()
 def _fetch_test_job_results(job_name: str, build_number: int):
-    url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/testReport"
+    url = f"{JENKINS_API_URL}/job/{job_name}/{build_number}/testReport"
     url = _convert_to_api_url(url)
     r = requests.get(url, auth=auth)
     if r.status_code == 200:
@@ -119,7 +129,7 @@ def _fetch_test_job_results(job_name: str, build_number: int):
 def _fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
     if build_number is None:
         build_number = "lastCompletedBuild"
-    url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}/injectedEnvVars"
+    url = f"{JENKINS_API_URL}/job/{job_name}/{build_number}/injectedEnvVars"
     url = _convert_to_api_url(url)
     r = requests.get(url, auth=auth)
     if r.status_code == 200:
@@ -163,12 +173,12 @@ def _make_url_from_job_name(job_name: str) -> str:
     """
     Creates url of job, not api url.
     """
-    return f"https://stable-cloud-images-ps5.jenkins.canonical.com/job/{job_name}/"
+    return f"{JENKINS_SSO_URL}/job/{job_name}/"
 
 def _convert_to_api_url(url: str) -> str:
     r = str(url).replace(
-        "https://stable-cloud-images-ps5.jenkins.canonical.com",
-        "http://stable-cloud-images-ps5-jenkins-be.internal:8080",
+        JENKINS_SSO_URL,
+        JENKINS_API_URL,
     )
     r = r.removesuffix("/").removesuffix("/api/json")
     r += "/api/json"
@@ -265,7 +275,7 @@ def _fetch_job_run_json_from_name_and_build(job_name: str, build_number: int) ->
     Returns:
         dict: The full json object of the job run from the Jenkins API.    
     """
-    url = f"http://stable-cloud-images-ps5-jenkins-be.internal:8080/job/{job_name}/{build_number}"
+    url = f"{JENKINS_API_URL}/job/{job_name}/{build_number}"
     return _get_job_run_from_api(url)
 
 def collect_job(job_name: str) -> Job:
