@@ -259,3 +259,41 @@ class TestMatrixJobRun(MatrixJobRun):
                         case.error_stack_trace = error_stack_trace
 
 # full fetch involves getting the parent job, getting 
+
+class TestJobRun(JobRun):
+    self_class: str = Field(frozen=True, default="TestJobRun")
+    test_results: Optional[TestResult] = Field(alias="testResults", default=None)
+
+    @classmethod
+    def from_data(cls, job_run_json: dict, test_results_json: Optional[dict]):
+        # test_results_json is None if the job failed to run properly and didn't produce any test results
+        if test_results_json is not None:
+            test_results = TestResult.from_data(**test_results_json)
+        result = super().from_data(**job_run_json)
+        result.test_results = test_results
+        return result
+
+    def fetch_error_texts_for_failed_tests(self, fetch_error_texts: callable):
+        """
+        Fetches the error details and stack trace for failed
+        
+        Args:
+            fetch_error_texts: callable that takes in the URL of the test report and returns a tuple of error details and stack trace
+        """
+
+        for suite in self.test_results.suites:
+            for case in suite.cases:
+                if case.status == "FAILED":
+                    try:
+                        error_details, error_stack_trace = fetch_error_texts(
+                            f"{self.url.rstrip('/')}/testReport/junit/{case.class_name}/{case.name}"
+                        )
+                    except Exception as e:
+                        print(f"Failed to fetch error texts for {case.name}, {case.class_name}, {self.url}")
+                        raise e
+                    case.error_details = error_details
+                    case.error_stack_trace = error_stack_trace
+
+
+
+
