@@ -5,7 +5,7 @@ import requests
 
 import dotenv
 
-from cpc_jank_db.models import MatrixJobRun, TestMatrixJobRun, Job, JobRun
+from cpc_jank_db.models import MatrixJobRun, TestMatrixJobRun, Job, JobRun, TestJobRun
 
 dotenv.load_dotenv()
 import os
@@ -15,6 +15,9 @@ auth = (os.getenv("JENKINS_API_USERNAME"), os.getenv("JENKINS_API_PASSWORD"))
 
 JENKINS_API_URL = os.getenv("JENKINS_API_URL")
 JENKINS_SSO_URL = os.getenv("JENKINS_SSO_URL")
+
+print(f"JENKINS_API_URL: {JENKINS_API_URL}")
+print(f"JENKINS_SSO_URL: {JENKINS_SSO_URL}")
 
 if JENKINS_API_URL is None:
     raise ValueError("JENKINS_API_URL not set in .env file")
@@ -29,6 +32,9 @@ cache = diskcache.Cache(".disk-cache")
 from cpc_jank_db import db
 
 suites = {
+    "14.04": "trusty",
+    "16.04": "xenial",
+    "18.04": "bionic",
     "20.04": "focal",
     "22.04": "jammy",
     "24.04": "noble",
@@ -232,15 +238,17 @@ def _parse_job_run_info(data: dict) -> dict:
         dict: The parsed job run info that can be used to create a JobRun object.
     """
     build_params = _get_build_parameters_from_actions(data.get("actions"))
-    if "SERIAL" not in build_params:
-        raise ValueError("SERIAL not found in build parameters")
+    # if "minimal" in data["fullDisplayName"].lower() or "base" in data["fullDisplayName"].lower():
+    #     family = "Minimal" if "minimal" in data["fullDisplayName"].lower() else "Base"
+    # else:
+    #     family = None
     return {
         "url": data["url"],
         "fullDisplayName": data["fullDisplayName"],
         "buildNumber": data["number"],
-        "serial": build_params["SERIAL"],
+        "serial": build_params.get("SERIAL"),
         "suite": suites.get(data["fullDisplayName"].split("-")[0]),
-        "family": "Minimal" if "minimal" in data["fullDisplayName"].lower() else "Base",
+        # "family": family,
         "description": data.get("description"),
         "timestamp_ms": data["timestamp"],
         "duration_ms": data["duration"],
@@ -292,13 +300,16 @@ def collect_job(job_name: str) -> Job:
         url=url,
         fullDisplayName=data["fullDisplayName"],
         suite=suites.get(data["fullDisplayName"].split("-")[0]),
-        family="Minimal" if "minimal" in data["fullDisplayName"].lower() else "Base",
         description=data.get("description"),
         buildNumbers=[entry["number"] for entry in data.get("builds", [])],
         lastCompletedBuildNumber=last_completed_build_number,
     )
 
-def collect_job_run(job_name: str, build_number: int) -> JobRun | MatrixJobRun | TestMatrixJobRun:
+def collect_job_run(
+        job_name: str, 
+        build_number: int,
+        job_run_type: Optional[type[JobRun]] = None,
+) -> JobRun | MatrixJobRun | TestMatrixJobRun | TestJobRun:
     print(f"Collecting job run info from API: {job_name} (#{build_number})")
     job_run_api_json = _fetch_job_run_json_from_name_and_build(job_name=job_name, build_number=build_number)
     job_run = _parse_job_run_object_from_api_json(job_run_api_json)
@@ -324,10 +335,28 @@ def collect_job_run(job_name: str, build_number: int) -> JobRun | MatrixJobRun |
             )
             result.console_output = console_output
             return result
-    # otherwise, it is a JobRun
+    # otherwise, it is a JobRun or TestJobRun
     else:
-        job_run.console_output = console_output
-        return job_run
+        if job_run_type == TestJobRun:
+            # try to fetch test results url 
+            test_job_results = _fetch_test_job_results(job_name, build_number)
+            if test_job_results.get("failCount") is not None:
+                result = TestJobRun.from_data(
+                    job_run_json=_parse_job_run_info(job_run_api_json),
+                    test_results_json=test_job_results,
+                )
+                result.fetch_error_texts_for_failed_tests(_get_error_texts)
+            # if test results do not exist or failCount is None, create a TestJobRun without test results
+            else:
+                result = TestJobRun.from_data(
+                    job_run_json=_parse_job_run_info(job_run_api_json),
+                    test_job_results=None,
+                )
+            result.console_output = console_output
+            return result
+        else:
+            job_run.console_output = console_output
+            return job_run
 
 def _fetch_and_refresh_job(job_name: str) -> Job:
     """
@@ -348,7 +377,10 @@ def _fetch_and_refresh_job(job_name: str) -> Job:
     return job
 
 
-def collect_all_job_runs(job_name: str) -> Tuple[Job, List[JobRun]]:
+def collect_all_job_runs(
+    job_name: str,
+    job_run_type: Optional[type[JobRun]] = None,
+) -> Tuple[Job, List[JobRun]]:
     """
     Fetch all job runs for a job and save them to the database.
     
@@ -386,7 +418,11 @@ def collect_all_job_runs(job_name: str) -> Tuple[Job, List[JobRun]]:
 
         print(f"Fetching job run: {job_name} (#{build_number})")
         try:
-            test_job_run = collect_job_run(job_name, build_number=build_number)
+            test_job_run = collect_job_run(
+                job_name=job_name,
+                build_number=build_number,
+                job_run_type=job_run_type,
+            )
             db.save_to_mongo(test_job_run)
             fetched_job_runs.append(test_job_run)
         except Exception as e:
