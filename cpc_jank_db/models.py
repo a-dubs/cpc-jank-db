@@ -38,6 +38,19 @@ class TestSuite(BaseModel):
         data["cases"] = cases
         return cls(**data)
 
+def _update_family_in_data(data: dict):
+    """
+    Parse the family of the job from the name or URL and update the data dictionary.
+
+    Args:
+        data: dictionary containing the job data
+    """
+    if "family" not in data:
+        name = data.get("fullDisplayName") or data.get("name")
+        if "minimal" in name.lower() or "base" in data["url"].lower():
+            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+    
+
 class Job(BaseModel):
     url: str
     name: str = Field(alias="fullDisplayName")
@@ -49,10 +62,7 @@ class Job(BaseModel):
     last_updated: datetime = Field(alias="lastUpdated", default_factory=datetime.now)
 
     def __init__(self, **data):
-        if "family" not in data:
-            if "minimal" in data["name"].lower() or "base" in data["url"].lower():
-                name = data.get("fullDisplayName") or data.get("name")
-                data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+        _update_family_in_data(data)
         super().__init__(**data)
 
     @classmethod
@@ -81,10 +91,7 @@ class JobRun(BaseModel):
     console_output: Optional[str] = Field(alias="consoleOutput", default=None)
 
     def __init__(self, **data):
-        if "family" not in data:
-            if "minimal" in data["name"].lower() or "base" in data["url"].lower():
-                name = data.get("fullDisplayName") or data.get("name")
-                data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+        _update_family_in_data(data)
         super().__init__(**data)
 
     @classmethod
