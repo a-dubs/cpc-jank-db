@@ -43,15 +43,16 @@ class Job(BaseModel):
     name: str = Field(alias="fullDisplayName")
     build_numbers: List[int] = Field(alias="buildNumbers")
     last_completed_build_number: Optional[int] = Field(alias="lastCompletedBuildNumber", default=None)
-    suite: str
-    family: Literal["Base", "Minimal"]
+    suite: Optional[str] = None  # only requireed for CPC Jenkins
+    family: Optional[Literal["Base", "Minimal"]] = None  # only requireed for CPC Jenkins
     description: Optional[str] = None
     last_updated: datetime = Field(alias="lastUpdated", default_factory=datetime.now)
 
     def __init__(self, **data):
         if "family" not in data:
-            name = data.get("fullDisplayName") or data.get("name")
-            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+            if "minimal" in data["name"].lower() or "base" in data["url"].lower():
+                name = data.get("fullDisplayName") or data.get("name")
+                data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
         super().__init__(**data)
 
     @classmethod
@@ -63,9 +64,9 @@ class JobRun(BaseModel):
     url: str
     name: str = Field(alias="fullDisplayName")
     build_number: int = Field(alias="buildNumber")
-    serial: str
-    suite: str
-    family: Literal["Base", "Minimal"]
+    family: Optional[Literal["Base", "Minimal"]] = None  # only requireed for CPC Jenkins
+    serial: Optional[str] = None  # only requireed for CPC Jenkins
+    suite: Optional[str] = None  # only requireed for CPC Jenkins
     description: Optional[str] = None
     timestamp_ms: int = Field(description="Timestamp of the job run in ms since epoch")
     duration_ms: int = Field(description="Duration of the job run in milliseconds")
@@ -81,21 +82,22 @@ class JobRun(BaseModel):
 
     def __init__(self, **data):
         if "family" not in data:
-            name = data.get("fullDisplayName") or data.get("name")
-            data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
+            if "minimal" in data["name"].lower() or "base" in data["url"].lower():
+                name = data.get("fullDisplayName") or data.get("name")
+                data["family"] = "Minimal" if "minimal" in name.lower() else "Base"
         super().__init__(**data)
 
     @classmethod
     def from_data(cls, **data):
         return cls(**data)
-
-    @property
-    def unique_identifier(self):
-        return f"{self.name}-{self.serial}-{self.build_number}"
     
     @property
     def job_name(self):
         return self.name.split("#")[0].strip()
+    
+    @property
+    def unique_identifier(self):
+        return f"{self.name}-{self.build_number}-{self.timestamp_ms}"
 
 class MatrixTestRunConfig(BaseModel):
     arch: Optional[str]
