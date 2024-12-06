@@ -4,6 +4,8 @@ from typing import List, Literal, Optional, Dict
 from datetime import datetime
 import re
 
+from tqdm import tqdm
+
 
 class TestCase(BaseModel):
     test_actions: List[Dict] = Field(alias="testActions")
@@ -171,6 +173,7 @@ class MatrixTestReport(BaseModel):
     
     def generate_test_case_report_url(self, test_case_name: str, test_case_class: str):
         test_case_class = utils.rreplace(test_case_class, ".", "/", 1)
+        
         return f"{self.url.rstrip('/')}/testReport/junit/{test_case_class}/{test_case_name}"
 
 class MatrixTestResults(BaseModel):
@@ -253,15 +256,22 @@ class TestMatrixJobRun(MatrixJobRun):
                 for case in suite.cases:
                     if case.status == "FAILED":
                         try:
-                            error_details, error_stack_trace = fetch_error_texts(
-                                test_report.generate_test_case_report_url(
-                                    test_case_name=case.name,
-                                    test_case_class=case.class_name,
-                                )
+                            url = test_report.generate_test_case_report_url(
+                                test_case_name=case.name,
+                                test_case_class=case.class_name,
                             )
+                            error_details, error_stack_trace = fetch_error_texts(url)
                         except Exception as e:
-                            print(f"Failed to fetch error texts for {case.name}, {case.class_name}, {self.url}")
-                            raise e
+                            error_msg = (
+                                f"Failed to fetch error texts using url: '{url}'"
+                                f" for {case.name}, {case.class_name}, {self.url}"
+                            )
+                            print(
+                                error_msg
+                            )
+                            raise Exception(
+                               error_msg
+                            ) from e
                         case.error_details = error_details
                         case.error_stack_trace = error_stack_trace
 
@@ -276,9 +286,21 @@ class TestJobRun(JobRun):
         # test_results_json is None if the job failed to run properly and didn't produce any test results
         if test_results_json is not None:
             test_results = TestResult.from_data(**test_results_json)
+        else:
+            test_results = None
         result = super().from_data(**job_run_json)
         result.test_results = test_results
         return result
+    
+    def generate_test_case_report_url(self, test_case_name: str, test_case_class: str):
+        test_case_class = utils.rreplace(test_case_class, ".", "/", 1)
+        need_sanitized = [" ", "(", ")", "[", "]", "{", "}", ":", ";", ",", ".", "<", ">", "?", "/", "\\", "|", "`", "~", "!", "@", "#", "$", "%", "^", "&", "*", "+", "=", "'", '"', "-"]
+        # sanitize the test case name
+        for char in need_sanitized:
+            test_case_name = test_case_name.replace(char, "_")
+        
+        return f"{self.url.rstrip('/')}/testReport/junit/{test_case_class}/{test_case_name}"
+    
 
     def fetch_error_texts_for_failed_tests(self, fetch_error_texts: callable):
         """
@@ -288,19 +310,30 @@ class TestJobRun(JobRun):
             fetch_error_texts: callable that takes in the URL of the test report and returns a tuple of error details and stack trace
         """
 
+        # create flattened list of all failed test cases and THEN fetch the error texts
+        failed_test_cases: List[TestCase] = []
+        for suite in self.test_results.suites:
+            failed_test_cases.extend([case for case in suite.cases if case.status == "FAILED"])
+
+        for case in tqdm(failed_test_cases, desc="Fetching error texts for failed tests"):
+            try:
+                error_details, error_stack_trace = fetch_error_texts(
+                    self.generate_test_case_report_url(
+                        test_case_name=case.name,
+                        test_case_class=case.class_name,
+                    )
+                )
+            except Exception as e:
+                print(f"Failed to fetch error texts for {case.name}, {case.class_name}, {self.url}")
+                raise e
+            case.error_details = error_details
+            case.error_stack_trace = error_stack_trace
+
+        # check to make sure that self.test_results error details and stack traces are filled in for all failed tests
         for suite in self.test_results.suites:
             for case in suite.cases:
-                if case.status == "FAILED":
-                    try:
-                        error_details, error_stack_trace = fetch_error_texts(
-                            f"{self.url.rstrip('/')}/testReport/junit/{case.class_name}/{case.name}"
-                        )
-                    except Exception as e:
-                        print(f"Failed to fetch error texts for {case.name}, {case.class_name}, {self.url}")
-                        raise e
-                    case.error_details = error_details
-                    case.error_stack_trace = error_stack_trace
-
+                if case.status == "FAILED" and (case.error_details is None or case.error_stack_trace is None):
+                    raise ValueError(f"Error details and stack trace not fetched for {case.name}, {case.class_name}, {self.url}")
 
 
 

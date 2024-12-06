@@ -29,7 +29,7 @@ Example:
 
 
 import re
-from typing import List
+from typing import List, Literal
 from pydantic import BaseModel, Field
 
 suites = {
@@ -77,6 +77,39 @@ class PipelineConfig(BaseModel):
     @property
     def upload_job_name(self):
         return self.get_job_name(r"upload|register")
+
+
+class CloudInitPipelineConfig(BaseModel):
+    image_type: Literal["generic", "minimal"]
+    suite: Literal["focal", "jammy", "noble", "oracular", "plucky"]
+    cloud_name: Literal["azure", "gce", "ec2", "oci", "ibm", "lxd_vm", "lxd_container"]
+    # cloud-init-integration-jammy-azure-generic
+    job_name_template: str = "cloud-init-integration-{suite}-{cloud_name}-{image_type}"
+
+    @classmethod
+    def valid_image_types(cls):
+        return ["generic", "minimal"]
+    
+    @classmethod
+    def valid_suites(cls):
+        return ["focal", "jammy", "noble", "oracular", "plucky"]
+    
+    @classmethod
+    def valid_cloud_names(cls):
+        return ["azure", "gce", "ec2", "oci", "ibm", "lxd_vm", "lxd_container"]
+
+    @classmethod
+    def generate_all_configs(cls) -> List["CloudInitPipelineConfig"]:
+        results = []
+        for image_type in cls.valid_image_types():
+            for suite in cls.valid_suites():
+                for cloud_name in cls.valid_cloud_names():
+                    results.append(cls(image_type=image_type, suite=suite, cloud_name=cloud_name))
+        return results
+
+    @property
+    def job_name(self):
+        return self.job_name_template.format(**self.model_dump())
 
 # this function is an example of how you could generate pipeline configurations
 # this should work for all basic pipelines

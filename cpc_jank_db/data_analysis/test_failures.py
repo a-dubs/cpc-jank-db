@@ -1,94 +1,216 @@
 
 # create pydantic model representing the data structure
+from datetime import datetime
 import pandas as pd
 from pydantic import BaseModel
 from typing import Dict, List, Literal, Optional, Set
 
-from cpc_jank_db.models import JobRun, MatrixTestReport, OracleMatrixTestRunConfig, TestCase, TestMatrixJobRun
+from cpc_jank_db.models import JobRun, MatrixTestReport, OracleMatrixTestRunConfig, TestCase, TestMatrixJobRun, TestJobRun, TestSuite
 
 class TestCaseFailure(BaseModel):
     test_case_name: str
+    test_case_class_name: str
     test_case_url: str
-    config_string: str
-    error_text: str
-    # details from JobRun that we want to capture:
+    build_number: int
+    job_run_url: str
     job_name : str  # job run name without the " #build_number" suffix
+    error_text: str
+    error_stack_trace: str
+    timestamp: datetime 
+
+    @classmethod
+    def from_data():
+        raise NotImplementedError
+
+    @classmethod
+    def get_failed_test_cases(test_job: JobRun) -> List["TestCaseFailure"]:
+        raise NotImplementedError
+
+    @classmethod
+    def compile_failed_test_cases(
+        test_job_runs: List[JobRun],
+    ) -> List["TestCaseFailure"]:
+        raise NotImplementedError
+    
+    @classmethod
+    def create_pandas_dataframe_for_failing_tests(cls, test_job_runs: List[JobRun]) -> pd.DataFrame:
+        raise NotImplementedError
+
+def parse_cloud_name(job_name: str) -> str:
+    return job_name.split("-")[-2]
+
+class CloudInitTestCaseFailure(TestCaseFailure):
+    image_type: Literal["generic", "minimal"]
+    suite: str
+    cloud_name: str
+    
+    @classmethod
+    def from_data(
+        cls,
+        test_suite: TestSuite,
+        test_case: TestCase,
+        job_run: TestJobRun,
+    ):
+        return cls(
+            test_case_name=test_case.name,
+            test_case_class_name=test_case.class_name,
+            image_type="generic" if "generic" in job_run.job_name.lower() else "minimal",
+            error_text=test_case.error_details,
+            error_stack_trace=test_case.error_stack_trace,
+            job_name=job_run.job_name,
+            build_number=job_run.build_number,
+            cloud_name=parse_cloud_name(job_run.job_name),
+            job_run_url=job_run.url,
+            suite=job_run.suite,
+            timestamp=test_suite.timestamp,
+            test_case_url=job_run.generate_test_case_report_url(
+                test_case_name=test_case.name,
+                test_case_class=test_case.class_name
+            )
+        )
+    
+    @classmethod
+    def get_failed_test_cases(cls, test_job: TestJobRun) -> List["CloudInitTestCaseFailure"]:
+        failed_test_cases = []
+        if test_job.test_results:
+            for suite in test_job.test_results.suites:
+                for case in suite.cases:
+                    if case.status == "FAILED":
+                        failed_test_cases.append(
+                            cls.from_data(
+                                test_suite=suite,
+                                test_case=case,
+                                job_run=test_job
+                            )
+                        )
+        return failed_test_cases
+    
+    @classmethod
+    def compile_failed_test_cases(
+        cls,
+        test_job_runs: List[TestJobRun],
+    ) -> List["CloudInitTestCaseFailure"]:
+        failed_test_cases = []
+        for test_job in test_job_runs:
+            failed_test_cases.extend(cls.get_failed_test_cases(test_job))
+        return failed_test_cases
+    
+    @classmethod
+    def create_pandas_dataframe_for_failing_tests(cls, test_job_runs: List[TestJobRun]) -> pd.DataFrame:
+        """
+        Create a pandas dataframe for failing tests from the given list of TestJobRun objects
+
+        Args:
+            test_job_runs: List of TestJobRun objects to extract failing tests from
+
+        Returns:
+            DataFrame: A pandas DataFrame containing the following columns:
+                - test_case_name: Name of the test case
+                - test_case_class_name: Class name of the test case
+                - error_text: Error text for the test case
+                - error_stack_trace: Error stack trace for the test case
+                - image_type: Type of the image ("generic" or "minimal")
+                - suite: Suite of the job run
+                - job_name: Name of the job run
+                - build_number: Build number of the job run
+                - job_run_url: URL of the job run
+                - test_case_url: URL of the test case
+                - timestamp: Timestamp that the test was run (datetime)
+        """
+        failed_test_cases = cls.compile_failed_test_cases(test_job_runs)
+        df = pd.DataFrame([test_case.model_dump() for test_case in failed_test_cases])
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        return df
+
+class CPCTestCaseFailure(TestCaseFailure):
+    # details from CPC JobRun that we want to capture:
+    config_string: str
     serial: str
     suite: str
     family: Literal["Base", "Minimal"]
-    build_number: int
-    job_run_url: str
 
     @classmethod    
     def from_data(
         cls,
         test_report: MatrixTestReport,
+        test_suite: TestSuite,
         test_case: TestCase,
         job_run: JobRun,
     ):
         return cls(
             test_case_name=test_case.name,
+            test_case_class_name=test_case.class_name,
             config_string=test_report.test_config.config_string,
             error_text=test_case.error_details,
+            error_stack_trace=test_case.error_stack_trace,
             job_name=job_run.job_name,
             serial=job_run.serial,
             suite=job_run.suite,
             family=job_run.family,
             build_number=job_run.build_number,
             job_run_url=job_run.url,
+            timestamp=test_suite.timestamp,
             test_case_url=test_report.generate_test_case_report_url(
                 test_case_name=test_case.name,
                 test_case_class=test_case.class_name
             )
         )
 
+    @classmethod
+    def get_failed_test_cases(cls, test_job: TestMatrixJobRun) -> List["CPCTestCaseFailure"]:
+        failed_test_cases = []
 
-def get_failed_test_cases(test_job: TestMatrixJobRun) -> List[TestCaseFailure]:
-    failed_test_cases = []
-
-    for test_report in test_job.test_results.matrix_test_reports:
-        for suite in test_report.test_result.suites:
-            for case in suite.cases:
-                if case.status == "FAILED":
-                    failed_test_cases.append(
-                        TestCaseFailure.from_data(
+        for test_report in test_job.test_results.matrix_test_reports:
+            for suite in test_report.test_result.suites:
+                for case in suite.cases:
+                    if case.status == "FAILED":
+                        failed_test_cases.append(
+                        cls.from_data(
                             test_report=test_report,
+                            test_suite=suite,
                             test_case=case,
                             job_run=test_job
                         )
                     )
 
-    return failed_test_cases
+        return failed_test_cases
 
+    @classmethod
+    def compile_failed_test_cases(
+        cls,
+        test_job_runs: List[TestMatrixJobRun | TestJobRun],
+    ) -> List["CPCTestCaseFailure"]:
+        
+        failed_test_cases = []
+        for test_job in test_job_runs:
+            failed_test_cases.extend(cls.get_failed_test_cases(test_job))
+        return failed_test_cases
 
-def compile_failed_test_cases(test_job_runs: List[TestMatrixJobRun]) -> List[TestCaseFailure]:
-    failed_test_cases = []
-    for test_job in test_job_runs:
-        failed_test_cases.extend(get_failed_test_cases(test_job))
-    return failed_test_cases
+    @classmethod
+    def create_pandas_dataframe_for_failing_tests(cls, test_job_runs: List[TestMatrixJobRun]) -> pd.DataFrame:
+        """
+        Create a pandas dataframe for failing tests from the given list of TestMatrixJobRun objects
 
-def create_pandas_dataframe_for_failing_tests(test_job_runs: List[TestMatrixJobRun]) -> pd.DataFrame:
-    """
-    Create a pandas dataframe for failing tests from the given list of TestMatrixJobRun objects
+        Args:
+            test_job_runs: List of TestMatrixJobRun objects to extract failing tests from
 
-    Args:
-        test_job_runs: List of TestMatrixJobRun objects to extract failing tests from
-
-    Returns:
-        DataFrame: A pandas DataFrame containing the following columns:
-            - test_case_name: Name of the test case
-            - config_string: Configuration string for the test case
-            - error_text: Error text for the test case
-            - job_name: Name of the job run
-            - serial: Serial number of the job run
-            - suite: Suite of the job run
-            - family: Family type of the image ("Base" or "Minimal")
-            - build_number: Build number of the job run
-            - job_run_url: URL of the job run
-            - test_case_url: URL of the test case
-    """
-    failed_test_cases = compile_failed_test_cases(test_job_runs)
-    return pd.DataFrame([test_case.model_dump() for test_case in failed_test_cases])
+        Returns:
+            DataFrame: A pandas DataFrame containing the following columns:
+                - test_case_name: Name of the test case
+                - test_case_class_name: Class name of the test case
+                - config_string: Configuration string for the test case
+                - error_text: Error text for the test case
+                - job_name: Name of the job run
+                - serial: Serial number of the job run
+                - suite: Suite of the job run
+                - family: Family type of the image ("Base" or "Minimal")
+                - build_number: Build number of the job run
+                - job_run_url: URL of the job run
+                - test_case_url: URL of the test case
+                - timestamp: Timestamp that the test was run
+        """
+        failed_test_cases = cls.compile_failed_test_cases(test_job_runs)
+        return pd.DataFrame([test_case.model_dump() for test_case in failed_test_cases])
 
 
 def print_failed_test_errors(
@@ -140,7 +262,6 @@ def get_test_reports_for_failed_test(
             continue  # Skip if there are no test results
 
         for test_report in job_run.test_results.matrix_test_reports:
-            config = test_report.test_config
             
             # Loop through suites and test cases
             for suite in test_report.test_result.suites:

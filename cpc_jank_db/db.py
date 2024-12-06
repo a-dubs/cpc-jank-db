@@ -10,8 +10,9 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 from pymongo import MongoClient
 
-from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun
+from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestMatrixJobRun, TestJobRun
 from cpc_jank_db.naming import PipelineConfig, ProjectConfig
+import tqdm
 
 client = MongoClient("mongodb://localhost:27069/")
 db = client["test_jenkins_observability_db"]
@@ -87,6 +88,8 @@ def create_job_run_from_data(data: dict):
             return MatrixJobRun(**data)
         elif data["self_class"] == "TestMatrixJobRun":
             return TestMatrixJobRun(**data)
+        elif data["self_class"] == "TestJobRun":
+            return TestJobRun(**data)
         else:
             raise ValueError(f"Unknown class: {data['self_class']}")
     except Exception as e:
@@ -106,7 +109,12 @@ def clear_db():
     job_run_collection.delete_many({})
     job_collection.delete_many({})
 
-
+def delete_job_and_job_runs(job_name: str):
+    """Delete all job runs and the job with the given name from the database."""
+    job_result = job_collection.delete_one({"fullDisplayName": job_name})
+    job_runs_result = job_run_collection.delete_many({"fullDisplayName": {"$regex": f"^{job_name} #[0-9]+"}})
+    print(f"Deleted job: {job_name} ({job_result.deleted_count} documents) and {job_runs_result.deleted_count} job runs")
+                                                        
 def get_most_recent_job_run_dict(job_name: str) -> Optional[Dict]:
     return job_run_collection.find_one(
         {"fullDisplayName": {"$regex": job_name}},
@@ -139,7 +147,7 @@ def get_test_job_runs_for_pipeline_config(pipeline_config: PipelineConfig) -> Li
 
 def get_test_job_runs_for_project(project_config: ProjectConfig) -> List[TestMatrixJobRun]:
     test_job_runs = []
-    for pipeline_config in project_config.pipeline_configs:
+    for pipeline_config in tqdm.tqdm(project_config.pipeline_configs, desc="Downloading test job runs per pipeline"):
         test_job_runs.extend(get_test_job_runs_for_pipeline_config(pipeline_config))
     return test_job_runs
 

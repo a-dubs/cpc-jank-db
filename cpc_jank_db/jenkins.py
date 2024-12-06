@@ -88,7 +88,7 @@ def _get_job_from_api(url: str) -> dict:
         print(r.text)
         raise Exception(f"Failed to fetch job from {url}")
 
-# @cache.memoize()
+@cache.memoize()
 def _get_job_run_from_api(url: str) -> dict:
     """
     Fetch job run data from the Jenkins API.
@@ -130,6 +130,7 @@ def _fetch_test_job_results(job_name: str, build_number: int):
     else:
         print(r.status_code)
         print(r.text)
+        print("tried url:", url)
         raise Exception(f"Failed to fetch test job results from {url}")
 
 def _fetch_env_vars(job_name: str, build_number: Optional[int] = None) -> dict:
@@ -155,7 +156,7 @@ def _get_build_parameters_from_actions(actions: list) -> dict:
         
     return {}
 
-# @cache.memoize()
+@cache.memoize()
 def _get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
     
     url = _convert_to_api_url(individual_test_report_url)
@@ -173,6 +174,7 @@ def _get_error_texts(individual_test_report_url: str) -> Tuple[str, str]:
     else:
         print(r.status_code)
         print(r.text)
+        print("tried url:", url)
         raise Exception(f"Failed to fetch error texts from {url}")
 
 def _make_url_from_job_name(job_name: str) -> str:
@@ -201,6 +203,7 @@ def _fetch_json(url: str) -> dict:
         raise Exception(f"Failed to fetch run json from {url}")
 
 # fetch plain text console output for job run using its url
+@cache.memoize()
 def _fetch_console_output(url: str) -> str:
     url = _convert_to_api_url(url)
     url = url.removesuffix("/api/json").removesuffix("/") + "/consoleText"
@@ -212,20 +215,20 @@ def _fetch_console_output(url: str) -> str:
         print(r.text)
         raise Exception(f"Failed to fetch console output from {url}")
 
-# @cache.memoize()
+@cache.memoize()
 def _fetch_matrix_child_runs(matrix_job_run_url: str) -> List[dict]:
-    url = _convert_to_api_url(matrix_job_run_url)
-    r = requests.get(url, auth=auth)
-    if r.status_code == 200:
-        data = r.json()
-        parsed_job_runs = [_parse_job_run_info(_fetch_json(run["url"])) for run in data["runs"]]
-        for job_run_dict in parsed_job_runs:
-            job_run_dict["consoleOutput"] = _fetch_console_output(job_run_dict["url"])
-        return parsed_job_runs
-    else:
-        print(r.status_code)
-        print(r.text)
-        raise Exception(f"Failed to fetch matrix child runs from {url}")
+    try:
+        parent_job_data = _get_job_run_from_api(matrix_job_run_url)
+        if parent_job_data:
+            parsed_job_runs = [
+                _parse_job_run_info(_get_job_run_from_api(run["url"]))
+                for run in parent_job_data["runs"]
+            ]
+            for job_run_dict in parsed_job_runs:
+                job_run_dict["consoleOutput"] = _fetch_console_output(job_run_dict["url"])
+            return parsed_job_runs
+    except Exception as e:
+        raise Exception(f"Failed to fetch matrix child runs from {matrix_job_run_url}") from e
 
 def _parse_job_run_info(data: dict) -> dict:
     """
@@ -242,12 +245,17 @@ def _parse_job_run_info(data: dict) -> dict:
     #     family = "Minimal" if "minimal" in data["fullDisplayName"].lower() else "Base"
     # else:
     #     family = None
+    if data["fullDisplayName"].split("-")[0] not in suites:
+        suite = next(iter([suite for suite in suites.values() if suite in data["fullDisplayName"]]), None)
+    else:
+        suite = suites.get(data["fullDisplayName"].split("-")[0])
+
     return {
         "url": data["url"],
         "fullDisplayName": data["fullDisplayName"],
         "buildNumber": data["number"],
         "serial": build_params.get("SERIAL"),
-        "suite": suites.get(data["fullDisplayName"].split("-")[0]),
+        "suite": suite,
         # "family": family,
         "description": data.get("description"),
         "timestamp_ms": data["timestamp"],
@@ -339,8 +347,12 @@ def collect_job_run(
     else:
         if job_run_type == TestJobRun:
             # try to fetch test results url 
-            test_job_results = _fetch_test_job_results(job_name, build_number)
-            if test_job_results.get("failCount") is not None:
+            try:
+                test_job_results = _fetch_test_job_results(job_name, build_number)
+            except Exception as e:
+                print(f"Failed to fetch test job results for {job_name} (#{build_number})")
+                test_job_results = None
+            if test_job_results and test_job_results.get("failCount") is not None:
                 result = TestJobRun.from_data(
                     job_run_json=_parse_job_run_info(job_run_api_json),
                     test_results_json=test_job_results,
@@ -350,7 +362,7 @@ def collect_job_run(
             else:
                 result = TestJobRun.from_data(
                     job_run_json=_parse_job_run_info(job_run_api_json),
-                    test_job_results=None,
+                    test_results_json=None,
                 )
             result.console_output = console_output
             return result
