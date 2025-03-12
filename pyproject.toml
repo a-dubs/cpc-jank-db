@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cpc-jank-db"
-version = "0.1.0"
+version = "0.2.0"
 description = "A jank database for storing and querying cpc jenkins pipelines results data"
 authors = [
     { name="a-dubs", email="alecwarren19@gmail.com" },
@@ -27,6 +27,7 @@ dependencies = [
     "requests",
     "pydantic",
     "pandas",
+    "tqdm",
 ]
 
 # dependencies that are only needed for development or testing, not for project to run
@@ -90,6 +91,7 @@ exclude = []  # files to exclude from linting
 select = [
   # Explicitly enable these ruff rules. See https://docs.astral.sh/ruff/rules/
 # Mandatory rules to adhere to (minimal effort but high impact)
+  "I",  # Isort
   "E2", # E2xx: Pycodestyle formatting issues
   "E4", # E4xx: Pycodestyle import-related errors
   "E7", # E7xx: Pycodestyle syntax errors

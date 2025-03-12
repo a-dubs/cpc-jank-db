@@ -1,11 +1,20 @@
-
 # create pydantic model representing the data structure
 from datetime import datetime
-import pandas as pd
-from pydantic import BaseModel
 from typing import Dict, List, Literal, Optional, Set
 
-from cpc_jank_db.models import JobRun, MatrixTestReport, OracleMatrixTestRunConfig, TestCase, TestMatrixJobRun, TestJobRun, TestSuite
+import pandas as pd
+from pydantic import BaseModel
+
+from cpc_jank_db.models import (
+    JobRun,
+    MatrixTestReport,
+    OracleMatrixTestRunConfig,
+    TestCase,
+    TestJobRun,
+    TestMatrixJobRun,
+    TestSuite,
+)
+
 
 class TestCaseFailure(BaseModel):
     test_case_name: str
@@ -13,10 +22,10 @@ class TestCaseFailure(BaseModel):
     test_case_url: str
     build_number: int
     job_run_url: str
-    job_name : str  # job run name without the " #build_number" suffix
+    job_name: str  # job run name without the " #build_number" suffix
     error_text: str
     error_stack_trace: str
-    timestamp: datetime 
+    timestamp: datetime
 
     @classmethod
     def from_data():
@@ -31,19 +40,21 @@ class TestCaseFailure(BaseModel):
         test_job_runs: List[JobRun],
     ) -> List["TestCaseFailure"]:
         raise NotImplementedError
-    
+
     @classmethod
     def create_pandas_dataframe_for_failing_tests(cls, test_job_runs: List[JobRun]) -> pd.DataFrame:
         raise NotImplementedError
 
+
 def parse_cloud_name(job_name: str) -> str:
     return job_name.split("-")[-2]
+
 
 class CloudInitTestCaseFailure(TestCaseFailure):
     image_type: Literal["generic", "minimal"]
     suite: str
     cloud_name: str
-    
+
     @classmethod
     def from_data(
         cls,
@@ -64,11 +75,10 @@ class CloudInitTestCaseFailure(TestCaseFailure):
             suite=job_run.suite,
             timestamp=test_suite.timestamp,
             test_case_url=job_run.generate_test_case_report_url(
-                test_case_name=test_case.name,
-                test_case_class=test_case.class_name
-            )
+                test_case_name=test_case.name, test_case_class=test_case.class_name
+            ),
         )
-    
+
     @classmethod
     def get_failed_test_cases(cls, test_job: TestJobRun) -> List["CloudInitTestCaseFailure"]:
         failed_test_cases = []
@@ -76,15 +86,9 @@ class CloudInitTestCaseFailure(TestCaseFailure):
             for suite in test_job.test_results.suites:
                 for case in suite.cases:
                     if case.status == "FAILED":
-                        failed_test_cases.append(
-                            cls.from_data(
-                                test_suite=suite,
-                                test_case=case,
-                                job_run=test_job
-                            )
-                        )
+                        failed_test_cases.append(cls.from_data(test_suite=suite, test_case=case, job_run=test_job))
         return failed_test_cases
-    
+
     @classmethod
     def compile_failed_test_cases(
         cls,
@@ -94,7 +98,7 @@ class CloudInitTestCaseFailure(TestCaseFailure):
         for test_job in test_job_runs:
             failed_test_cases.extend(cls.get_failed_test_cases(test_job))
         return failed_test_cases
-    
+
     @classmethod
     def create_pandas_dataframe_for_failing_tests(cls, test_job_runs: List[TestJobRun]) -> pd.DataFrame:
         """
@@ -122,6 +126,7 @@ class CloudInitTestCaseFailure(TestCaseFailure):
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         return df
 
+
 class CPCTestCaseFailure(TestCaseFailure):
     # details from CPC JobRun that we want to capture:
     config_string: str
@@ -129,7 +134,7 @@ class CPCTestCaseFailure(TestCaseFailure):
     suite: str
     family: Literal["Base", "Minimal"]
 
-    @classmethod    
+    @classmethod
     def from_data(
         cls,
         test_report: MatrixTestReport,
@@ -151,9 +156,8 @@ class CPCTestCaseFailure(TestCaseFailure):
             job_run_url=job_run.url,
             timestamp=test_suite.timestamp,
             test_case_url=test_report.generate_test_case_report_url(
-                test_case_name=test_case.name,
-                test_case_class=test_case.class_name
-            )
+                test_case_name=test_case.name, test_case_class=test_case.class_name
+            ),
         )
 
     @classmethod
@@ -165,13 +169,8 @@ class CPCTestCaseFailure(TestCaseFailure):
                 for case in suite.cases:
                     if case.status == "FAILED":
                         failed_test_cases.append(
-                        cls.from_data(
-                            test_report=test_report,
-                            test_suite=suite,
-                            test_case=case,
-                            job_run=test_job
+                            cls.from_data(test_report=test_report, test_suite=suite, test_case=case, job_run=test_job)
                         )
-                    )
 
         return failed_test_cases
 
@@ -180,7 +179,6 @@ class CPCTestCaseFailure(TestCaseFailure):
         cls,
         test_job_runs: List[TestMatrixJobRun | TestJobRun],
     ) -> List["CPCTestCaseFailure"]:
-        
         failed_test_cases = []
         for test_job in test_job_runs:
             failed_test_cases.extend(cls.get_failed_test_cases(test_job))
@@ -229,13 +227,19 @@ def print_failed_test_errors(
 
         for test_report in job_run.test_results.matrix_test_reports:
             config = test_report.test_config
-            
+
             # Apply MatrixTestRunConfig filters (AND condition for all provided filters)
-            if (arch and config.arch != arch) or \
-               (instance_type and config.instance_type != instance_type) or \
-               (test and config.test != test) or \
-               (login_method and isinstance(config, OracleMatrixTestRunConfig) and config.login_method != login_method) or \
-               (launch_mode and isinstance(config, OracleMatrixTestRunConfig) and config.launch_mode != launch_mode):
+            if (
+                (arch and config.arch != arch)
+                or (instance_type and config.instance_type != instance_type)
+                or (test and config.test != test)
+                or (
+                    login_method
+                    and isinstance(config, OracleMatrixTestRunConfig)
+                    and config.login_method != login_method
+                )
+                or (launch_mode and isinstance(config, OracleMatrixTestRunConfig) and config.launch_mode != launch_mode)
+            ):
                 continue  # Skip this test report if any filter does not match
 
             # Loop through suites and test cases
@@ -250,7 +254,6 @@ def print_failed_test_errors(
 def get_test_reports_for_failed_test(
     test_name: str,
     test_job_runs: List[TestMatrixJobRun],
-    
 ) -> List[MatrixTestReport]:
     """
     We want to return the matrix test report for all failed tests with the given test name
@@ -262,7 +265,6 @@ def get_test_reports_for_failed_test(
             continue  # Skip if there are no test results
 
         for test_report in job_run.test_results.matrix_test_reports:
-            
             # Loop through suites and test cases
             for suite in test_report.test_result.suites:
                 for case in suite.cases:
@@ -271,19 +273,22 @@ def get_test_reports_for_failed_test(
                         # print(f"Test Case: {case.name}")
                         # print(f"Error Details: {case.error_details}\n")
                         results.append(test_report)
-                    
+
     return results
+
 
 class FailedTestRun(BaseModel):
     url: str
     config_string: str
     error_text: str
 
+
 class FailedTestDetails(BaseModel):
     test_name: str
     fail_count: int
     ran_count: int
     runs: List[FailedTestRun]
+
 
 def get_failed_test_details(test_job: TestMatrixJobRun) -> List[FailedTestDetails]:
     failed_tests = []
@@ -296,14 +301,13 @@ def get_failed_test_details(test_job: TestMatrixJobRun) -> List[FailedTestDetail
                     fail_count = 1
                     ran_count = 1
                     test_case_report_url = test_report.generate_test_case_report_url(
-                        test_case_name=case.name,
-                        test_case_class=case.class_name
+                        test_case_name=case.name, test_case_class=case.class_name
                     )
                     runs = [
                         FailedTestRun(
                             url=test_case_report_url,
                             config_string=test_report.test_config.config_string,
-                            error_text=case.error_details
+                            error_text=case.error_details,
                         )
                     ]
 
@@ -315,17 +319,16 @@ def get_failed_test_details(test_job: TestMatrixJobRun) -> List[FailedTestDetail
                                 FailedTestRun(
                                     url=test_case_report_url,
                                     config_string=test_report.test_config.config_string,
-                                    error_text=case.error_details
+                                    error_text=case.error_details,
                                 )
                             )
                             break
                     else:
-                        failed_tests.append(FailedTestDetails(
-                            test_name=test_name,
-                            fail_count=fail_count,
-                            ran_count=ran_count,
-                            runs=runs
-                        ))
+                        failed_tests.append(
+                            FailedTestDetails(
+                                test_name=test_name, fail_count=fail_count, ran_count=ran_count, runs=runs
+                            )
+                        )
 
     return failed_tests
 
@@ -342,6 +345,7 @@ def get_test_set(test_job: TestMatrixJobRun) -> Set[str]:
                 test_set.add(case.name)
     return test_set
 
+
 # Function to get the tests that failed and their success, skip, and failure counts
 def get_test_stats(test_job: TestMatrixJobRun) -> Dict[str, Dict[str, int]]:
     stats = {}
@@ -353,12 +357,8 @@ def get_test_stats(test_job: TestMatrixJobRun) -> Dict[str, Dict[str, int]]:
         for suite in test_report.test_result.suites:
             for case in suite.cases:
                 if case.name not in stats:
-                    stats[case.name] = {
-                        "succeeded": 0,
-                        "skipped": 0,
-                        "failed": 0
-                    }
-                
+                    stats[case.name] = {"succeeded": 0, "skipped": 0, "failed": 0}
+
                 if case.status == "PASSED":
                     stats[case.name]["succeeded"] += 1
                 elif case.status == "SKIPPED":
@@ -367,4 +367,3 @@ def get_test_stats(test_job: TestMatrixJobRun) -> Dict[str, Dict[str, int]]:
                     stats[case.name]["failed"] += 1
 
     return stats
-

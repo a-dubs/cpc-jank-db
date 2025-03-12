@@ -27,9 +27,9 @@ Example:
         print(f"Collected {len(job_runs)} job runs for {job_name}")
 """
 
-
 import re
 from typing import List, Literal
+
 from pydantic import BaseModel, Field
 
 suites = {
@@ -40,6 +40,7 @@ suites = {
     "25.04": "plucky",
 }
 
+
 # feel free to import this and extend it in your own code
 class PipelineConfig(BaseModel):
     pipeline_key: str
@@ -47,11 +48,11 @@ class PipelineConfig(BaseModel):
     family: str
     upload_type: str
     job_name_templates: List[str] = Field(
-        description="List of job name templates to generate", 
-        examples="['{release}-{family}-Oracle-Build-Images', '{release}-{family}-Oracle-{upload_type}-Upload-Image', '{release}-{family}-Oracle-{upload_type}-Test']"
+        description="List of job name templates to generate",
+        examples="['{release}-{family}-Oracle-Build-Images', '{release}-{family}-Oracle-{upload_type}-Upload-Image', '{release}-{family}-Oracle-{upload_type}-Test']",
     )
 
-    @property 
+    @property
     def name(self):
         return f"{self.pipeline_key}-{self.release}-{self.family}-{self.upload_type}"
 
@@ -62,18 +63,18 @@ class PipelineConfig(BaseModel):
     @property
     def all_job_names(self):
         return [template.format(**self.model_dump()) for template in self.job_name_templates]
-    
+
     def get_job_name(self, re_str: str):
         return next((job_name for job_name in self.all_job_names if re.findall(re_str, job_name.lower())), None)
-    
+
     @property
     def test_job_name(self):
         return self.get_job_name(r"test")
-    
+
     @property
-    def build_job_name(self):   
+    def build_job_name(self):
         return self.get_job_name(r"build")
-    
+
     @property
     def upload_job_name(self):
         return self.get_job_name(r"upload|register")
@@ -89,11 +90,11 @@ class CloudInitPipelineConfig(BaseModel):
     @classmethod
     def valid_image_types(cls):
         return ["generic", "minimal"]
-    
+
     @classmethod
     def valid_suites(cls):
         return ["focal", "jammy", "noble", "oracular", "plucky"]
-    
+
     @classmethod
     def valid_cloud_names(cls):
         return ["azure", "gce", "ec2", "oci", "ibm", "lxd_vm", "lxd_container"]
@@ -110,6 +111,7 @@ class CloudInitPipelineConfig(BaseModel):
     @property
     def job_name(self):
         return self.job_name_template.format(**self.model_dump())
+
 
 # this function is an example of how you could generate pipeline configurations
 # this should work for all basic pipelines
@@ -155,18 +157,19 @@ def generate_pipeline_configs(
     for release in releases:
         for family in families:
             for upload_type in upload_types:
-                results.append(PipelineConfig(
-                    pipeline_key=pipeline_key,
-                    release=release,
-                    family=family,
-                    upload_type=upload_type,
-                    job_name_templates=job_name_templates,
-                ))
+                results.append(
+                    PipelineConfig(
+                        pipeline_key=pipeline_key,
+                        release=release,
+                        family=family,
+                        upload_type=upload_type,
+                        job_name_templates=job_name_templates,
+                    )
+                )
     return results
 
-def generate_all_job_names(
-    pipeline_configs: List[PipelineConfig]
-) -> List[str]:
+
+def generate_all_job_names(pipeline_configs: List[PipelineConfig]) -> List[str]:
     """
     Generates a list of all job names from a list of pipeline configurations.
 
@@ -176,11 +179,8 @@ def generate_all_job_names(
     Returns:
         List[str]: A list of all generated job names.
     """
-    return [
-        job_name
-        for pipeline_config in pipeline_configs
-        for job_name in pipeline_config.all_job_names
-    ]
+    return [job_name for pipeline_config in pipeline_configs for job_name in pipeline_config.all_job_names]
+
 
 class ProjectConfig(BaseModel):
     name: str
@@ -189,15 +189,15 @@ class ProjectConfig(BaseModel):
     @property
     def all_job_names(self):
         return generate_all_job_names(self.pipeline_configs)
-    
+
     @property
     def test_job_names(self):
         return [pipeline_config.test_job_name for pipeline_config in self.pipeline_configs]
-    
+
     @property
     def build_job_names(self):
         return [pipeline_config.build_job_name for pipeline_config in self.pipeline_configs]
-    
+
     @property
     def upload_job_names(self):
         return [pipeline_config.upload_job_name for pipeline_config in self.pipeline_configs]
