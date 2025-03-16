@@ -27,6 +27,8 @@ if JENKINS_API_URL is None:
 if JENKINS_SSO_URL is None:
     raise ValueError("JENKINS_SSO_URL not set in .env file")
 
+if auth[0] is None or auth[1] is None:
+    raise ValueError("JENKINS_API_USERNAME or JENKINS_API_PASSWORD not set in .env file")
 
 cache = diskcache.Cache(".disk-cache")
 
@@ -66,11 +68,10 @@ def _append_tree_query_param(url: str, fields_to_fetch: list[str]) -> str:
 class JenkinsAPIError(Exception):
     # take in a url and a response object from requests
     def __init__(
-        self, url: str, response: requests.Response, attempted_action: str = None, root_cause: Exception = None
+        self, url: str, response: Optional[requests.Response], attempted_action: str = None, root_cause: Exception = None
     ):
         self.url = url
-        self.status_code = response.status_code
-        self.text = response.text
+        self.response = response
         self.attempted_action = attempted_action or "fetch data"
         self.root_cause = root_cause
         if root_cause is None:
@@ -80,8 +81,9 @@ class JenkinsAPIError(Exception):
 
         self.message = (
             f"Failed to {self.attempted_action} from Jenkins API at {url}. {root_cause_message}"
-            f"Response code: {self.status_code}"
+            + (f"Response code: {self.response.status_code}" if self.response else "")
         )
+        print("message:",self.message)
         super().__init__(self.message)
 
     def __str__(self):
