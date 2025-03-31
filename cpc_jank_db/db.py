@@ -15,19 +15,40 @@ from pymongo import MongoClient
 
 from cpc_jank_db.models import Job, JobRun, MatrixJobRun, TestJobRun, TestMatrixJobRun
 from cpc_jank_db.naming import PipelineConfig, ProjectConfig
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
-r = subprocess.run(["nc", "-z", "localhost", "27069"], check=False)
-if not r.returncode == 0:
-    print(
-        "Mongo port not reachable on localhost. Make sure you have a tunnel running to the cpc-jank-db server.\n"
-        "Hint: try running `bash ssh-tunnel.sh` to start the tunnel.\n"
-        "Contact @a-dubs for more info if needed or if you need added to the server."
-    )
-    raise ConnectionError(
-        "Mongo port not reachable on localhost. Make sure you have a tunnel running to the cpc-jank-db server."
-    )
+username = os.getenv("MONGO_USERNAME")
+password = os.getenv("MONGO_PASSWORD")
+uri = os.getenv("MONGO_URI")
 
-client = MongoClient("mongodb://localhost:27069/")  # , tz_aware=True)
+
+if not uri and not username and not password:
+    print("No mongo uri set, assuming you are using the ssh tunnel.")
+    r = subprocess.run(["nc", "-z", "localhost", "27069"], check=False)
+    if not r.returncode == 0:
+        print(
+            "Mongo port not reachable on localhost. Make sure you have a tunnel running to the cpc-jank-db server.\n"
+            "Hint: try running `bash ssh-tunnel.sh` to start the tunnel.\n"
+            "Contact @a-dubs for more info if needed or if you need added to the server."
+        )
+        raise ConnectionError(
+            "Mongo port not reachable on localhost. Make sure you have a tunnel running to the cpc-jank-db server."
+        )
+
+if username and password:
+    print("Using username and password from environment variables.")
+    client = MongoClient(
+        uri or "mongodb://localhost:27069/",
+        username=username,
+        password=password,
+        authSource="admin"
+    )
+else:
+    print("No password or username set, assuming you are using the ssh tunnel.")
+    client = MongoClient("mongodb://localhost:27069/")
+
 db = client["test_jenkins_observability_db"]
 job_collection = db["jenkins_job_collection"]
 job_run_collection = db["jenkins_job_run_collection"]
@@ -216,6 +237,18 @@ def get_all_fetched_build_numbers_for_job(job_name: str) -> List[int]:
     result = job_run_collection.find({"fullDisplayName": {"$regex": job_name}}, {"buildNumber": 1})
     return [doc["buildNumber"] for doc in result]
 
+# function to pull the entire MongoDB instance to a local file that can be applied to a different MongoDB instance
+# to migrate the database
+def dump_mongo_db():
+    # dump the entire MongoDB instance to a file
+    subprocess.run(["mongodump", "--out", "mongo_dump"])
+    # compress the dump to a tar.gz file
+    subprocess.run(["tar", "-czvf", "mongo_dump.tar.gz", "mongo_dump"])
+
+def push_mongo_db():
+    # push the entire MongoDB instance to a remote server
+    subprocess.run(["tar", "-xzvf", "mongo_dump.tar.gz"])
+    subprocess.run(["mongorestore", "--drop", "mongo_dump"])
 
 if __name__ == "__main__":
     # print out list of all job names in the db and then also print out the number of job runs stored for each job
@@ -224,5 +257,13 @@ if __name__ == "__main__":
     #     job_name = job["fullDisplayName"]
     #     runs = get_job_runs_for_job(job_name)
     #     print(f"Job: {job_name} has {len(runs)} job runs stored")
-    stats = db.command("dbStats", scale=1024 * 1024)  # Scale to MB
-    print("Database size (MB):", stats["dataSize"])
+    # stats = db.command("dbStats", scale=1024 * 1024)  # Scale to MB
+    # print("Database size (MB):", stats["dataSize"])
+
+    # list number of entries in the job_collection and job_run_collection
+    job_count = job_collection.count_documents({})
+    job_run_count = job_run_collection.count_documents({})
+    print(f"Job collection count: {job_count}")
+    print(f"Job run collection count: {job_run_count}")
+
+    # 
