@@ -390,3 +390,13 @@ def get_test_stats(test_job: TestMatrixJobRun) -> Dict[str, Dict[str, int]]:
                     stats[case.name]["failed"] += 1
 
     return stats
+
+
+if __name__ == "__main__":
+    from cpc_jank_db import db
+    example_job="cloud-init-integration-focal-azure-generic"
+    recent_job_run: TestJobRun = db.get_most_recent_job_run(job_name=example_job)
+    failed_test_details = CloudInitTestCaseFailure.get_failed_test_cases(test_job=recent_job_run)
+    print(failed_test_details)
+    if failed_test_details:
+        print("Parsed cloud-init version:", failed_test_details[0].cloud_init_version) 
