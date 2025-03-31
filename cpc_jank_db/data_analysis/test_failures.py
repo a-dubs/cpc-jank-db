@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional, Set
 
 import pandas as pd
+import re
 from pydantic import BaseModel
 
 from cpc_jank_db.models import (
@@ -49,11 +50,30 @@ class TestCaseFailure(BaseModel):
 def parse_cloud_name(job_name: str) -> str:
     return job_name.split("-")[-2]
 
+def parse_cloud_init_version_from_console_output(console_output: Optional[str]) -> Optional[str]:
+    """
+    Parse the cloud-init version from the console output of a job run
+    
+    Args:
+        console_output Optional[str]: The console output of the job run
+    
+    Returns:
+        str: The cloud-init version if found, otherwise None
+    """
+    # for a line like: `cloud-init version: /usr/bin/cloud-init 99.daily-202503112148-3da7eca87~ubuntu20.04.1`
+    # we want "99.daily-202503112148-3da7eca87~ubuntu20.04.1" from the above example
+    if not console_output:
+        return None
+    match = re.search(r"cloud-init version: /usr/bin/cloud-init (.+)", console_output)
+    if match:
+        return match.group(1)
+    return None
 
 class CloudInitTestCaseFailure(TestCaseFailure):
     image_type: Literal["generic", "minimal"]
     suite: str
     cloud_name: str
+    cloud_init_version: Optional[str] = None
 
     @classmethod
     def from_data(
@@ -76,7 +96,8 @@ class CloudInitTestCaseFailure(TestCaseFailure):
             timestamp=test_suite.timestamp,
             test_case_url=job_run.generate_test_case_report_url(
                 test_case_name=test_case.name, test_case_class=test_case.class_name
-            ),
+            ),            
+            cloud_init_version=parse_cloud_init_version_from_console_output(job_run.console_output),
         )
 
     @classmethod
@@ -120,6 +141,8 @@ class CloudInitTestCaseFailure(TestCaseFailure):
                 - job_run_url: URL of the job run
                 - test_case_url: URL of the test case
                 - timestamp: Timestamp that the test was run (datetime)
+                - cloud_name: Name of the cloud provider
+                - cloud_init_version: Version of cloud-init used in the test
         """
         failed_test_cases = cls.compile_failed_test_cases(test_job_runs)
         df = pd.DataFrame([test_case.model_dump() for test_case in failed_test_cases])
